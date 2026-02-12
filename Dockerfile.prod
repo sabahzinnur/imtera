@@ -1,5 +1,5 @@
 # Stage 1: Build frontend assets
-FROM node:20-alpine as frontend
+FROM node:20-alpine AS frontend
 
 WORKDIR /app
 COPY package*.json ./
@@ -11,15 +11,15 @@ RUN npm run build
 FROM php:8.4-fpm
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y 
-    git 
-    curl 
-    libpng-dev 
-    libonig-dev 
-    libxml2-dev 
-    zip 
-    unzip 
-    libpq-dev 
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    zip \
+    unzip \
+    libpq-dev \
     libzip-dev
 
 # Clear cache
