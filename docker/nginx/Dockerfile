@@ -22,9 +22,7 @@ RUN cp .env.example .env
 
 
 
-# Install Composer dependencies
-
- (needed for artisan)
+# Install Composer dependencies (needed for artisan)
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 RUN composer install --no-interaction --no-plugins --no-scripts
 
