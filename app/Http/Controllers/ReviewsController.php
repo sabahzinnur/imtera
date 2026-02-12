@@ -34,7 +34,7 @@ class ReviewsController extends Controller
             'reviews' => $reviews,
             'setting' => $setting,
             'sort' => $sort,
-            'isSyncing' => $setting && ! $setting->last_synced_at,
+            'isSyncing' => $setting && in_array($setting->sync_status, ['pending', 'syncing']),
         ]);
     }
 }

@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class SyncYandexReviews implements ShouldQueue
@@ -18,7 +19,7 @@ class SyncYandexReviews implements ShouldQueue
 
     public int $tries = 3;
 
-    public int $timeout = 120;
+    public int $timeout = 300; // Увеличим таймаут для парсинга нескольких страниц
 
     public function __construct(public int $userId) {}
 
@@ -32,20 +33,31 @@ class SyncYandexReviews implements ShouldQueue
             return;
         }
 
+        $setting->update([
+            'sync_status' => 'syncing',
+            'sync_error' => null,
+        ]);
+
         try {
             $result = $parser->fetchAllReviews($setting->business_id);
 
-            foreach ($result['reviews'] as $data) {
-                Review::updateOrCreate(
-                    ['user_id' => $this->userId, 'yandex_review_id' => $data['yandex_review_id']],
-                    array_merge($data, ['user_id' => $this->userId])
-                );
-            }
+            DB::transaction(function () use ($result) {
+                foreach ($result['reviews'] as $data) {
+                    Review::updateOrCreate(
+                        [
+                            'user_id' => $this->userId,
+                            'yandex_review_id' => $data['yandex_review_id'],
+                        ],
+                        array_merge($data, ['user_id' => $this->userId])
+                    );
+                }
+            });
 
             $setting->update([
                 'rating' => $result['rating'],
                 'reviews_count' => $result['total'],
                 'last_synced_at' => now(),
+                'sync_status' => 'completed',
             ]);
 
         } catch (\Exception $e) {
@@ -53,6 +65,12 @@ class SyncYandexReviews implements ShouldQueue
                 'user' => $this->userId,
                 'error' => $e->getMessage(),
             ]);
+
+            $setting->update([
+                'sync_status' => 'failed',
+                'sync_error' => $e->getMessage(),
+            ]);
+
             $this->fail($e);
         }
     }

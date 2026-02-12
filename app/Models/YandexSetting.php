@@ -14,6 +14,8 @@ class YandexSetting extends Model
         'rating',
         'reviews_count',
         'last_synced_at',
+        'sync_status',
+        'sync_error',
     ];
 
     protected $casts = [

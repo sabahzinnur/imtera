@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\SyncYandexReviews;
 use App\Models\YandexSetting;
 use App\Services\YandexMapsParser;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -20,7 +21,7 @@ class SettingsController extends Controller
         ]);
     }
 
-    public function save(Request $request, YandexMapsParser $parser)
+    public function save(Request $request, YandexMapsParser $parser): RedirectResponse
     {
         $request->validate([
             'maps_url' => ['required', 'url', 'regex:/yandex\.(ru|com)\/maps/'],
@@ -43,6 +44,8 @@ class SettingsController extends Controller
             [
                 'maps_url' => $request->maps_url,
                 'business_id' => $businessId,
+                'sync_status' => 'pending',
+                'sync_error' => null,
             ]
         );
 

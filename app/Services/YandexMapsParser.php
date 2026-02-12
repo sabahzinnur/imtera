@@ -9,26 +9,28 @@ use Illuminate\Support\Facades\Log;
 class YandexMapsParser
 {
     private Client $client;
+
     private CookieJar $jar;
 
-    private const BASE_URL   = 'https://yandex.ru';
+    private const BASE_URL = 'https://yandex.ru';
+
     private const REVIEWS_EP = '/maps/api/business/fetchReviews';
 
     public function __construct()
     {
-        $this->jar = new CookieJar();
+        $this->jar = new CookieJar;
 
         $this->client = new Client([
             'base_uri' => self::BASE_URL,
-            'timeout'  => 20,
-            'headers'  => [
-                'User-Agent'      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                    . 'AppleWebKit/537.36 (KHTML, like Gecko) '
-                    . 'Chrome/120.0.0.0 Safari/537.36',
-                'Accept'          => 'application/json, text/javascript, */*; q=0.01',
+            'timeout' => 20,
+            'headers' => [
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                    .'AppleWebKit/537.36 (KHTML, like Gecko) '
+                    .'Chrome/120.0.0.0 Safari/537.36',
+                'Accept' => 'application/json, text/javascript, */*; q=0.01',
                 'Accept-Language' => 'ru-RU,ru;q=0.9',
-                'X-Requested-With'=> 'XMLHttpRequest',
-                'Referer'         => 'https://yandex.ru/maps/',
+                'X-Requested-With' => 'XMLHttpRequest',
+                'Referer' => 'https://yandex.ru/maps/',
             ],
             'cookies' => $this->jar,
         ]);
@@ -48,90 +50,82 @@ class YandexMapsParser
      */
     public function extractBusinessId(string $url): ?string
     {
-        // /org/{slug}/{id}/
         if (preg_match('/\/org\/[^\/]+\/(\d{5,})/', $url, $m)) {
             return $m[1];
         }
-        // ?oid=...
         if (preg_match('/[?&]oid=(\d+)/', $url, $m)) {
             return $m[1];
         }
+
         return null;
     }
 
     /**
-     * Загрузить все отзывы организации (до $maxPages × 10 штук).
+     * Загрузить все отзывы организации.
      *
-     * @return array{
-     *   reviews: list<array{
-     *     yandex_review_id: string,
-     *     author_name: string,
-     *     author_phone: string|null,
-     *     branch_name: string|null,
-     *     rating: int,
-     *     text: string|null,
-     *     published_at: string|null
-     *   }>,
-     *   rating: float,
-     *   total: int
-     * }
+     * @return array{reviews: list<array>, rating: float, total: int}
      */
     public function fetchAllReviews(string $businessId, int $maxPages = 10): array
     {
-        // Шаг 1: получаем csrfToken через пустой POST (надёжный способ)
-        $csrfToken = $this->fetchCsrfTokenViaPost();
+        Log::info('YandexMapsParser: start', ['businessId' => $businessId]);
 
-        if (!$csrfToken) {
+        $csrfToken = $this->fetchCsrfTokenViaPost($businessId);
+
+        if (! $csrfToken) {
+            Log::error('YandexMapsParser: no CSRF token');
             throw new \RuntimeException('Не удалось получить CSRF-токен Яндекса');
         }
 
-        // Генерируем идентификаторы сессии один раз на всю серию запросов
+        Log::info('YandexMapsParser: got CSRF token', ['token' => $csrfToken]);
+
         $ts        = (int) round(microtime(true) * 1000);
-        $sessionId = $ts . '_' . rand(100000, 999999);
-        $reqId     = $ts . rand(100, 999) . '-' . rand(100000000, 999999999);
+        $sessionId = $ts.'_'.rand(100000, 999999);
+        // reqId генерируем в формате близком к браузерному
+        $reqId     = $ts.rand(100, 999).'-'.rand(100000000, 999999999).'-sas1-'.rand(1000, 9999);
 
         $allReviews = [];
         $rating     = 0.0;
         $total      = 0;
 
         for ($page = 0; $page < $maxPages; $page++) {
+            Log::info('YandexMapsParser: fetching page', ['page' => $page + 1]);
+
             try {
-                $result = $this->fetchPage(
-                    $businessId, $csrfToken, $sessionId, $reqId, $page
-                );
+                $result = $this->fetchPage($businessId, $csrfToken, $sessionId, $reqId, $page);
             } catch (\Exception $e) {
-                Log::error('YandexMapsParser: страница не загружена', [
-                    'businessId' => $businessId,
-                    'page'       => $page,
-                    'error'      => $e->getMessage(),
+                Log::error('YandexMapsParser: page failed', [
+                    'page'  => $page + 1,
+                    'error' => $e->getMessage(),
                 ]);
                 break;
             }
 
-            // Нет отзывов на странице — закончили
             if (empty($result['data']['reviews'])) {
+                Log::info('YandexMapsParser: no reviews on page', ['page' => $page + 1]);
                 break;
             }
 
-            // Метаданные берём только с первой страницы
             if ($page === 0) {
                 $rating = (float) ($result['data']['businessRating']['score'] ?? 0);
                 $total  = (int)   ($result['data']['businessRating']['votes'] ?? 0);
+                Log::info('YandexMapsParser: meta', ['rating' => $rating, 'total' => $total]);
             }
 
             foreach ($result['data']['reviews'] as $r) {
                 $allReviews[] = $this->mapReview($r);
             }
 
-            // Проверяем, есть ли следующая страница
             $totalPages = (int) ($result['data']['pager']['total'] ?? 1);
+            Log::info('YandexMapsParser: pager', ['page' => $page + 1, 'totalPages' => $totalPages]);
+
             if ($page + 1 >= $totalPages) {
                 break;
             }
 
-            // Пауза между запросами — не торопимся
-            usleep(900_000); // 0.9 сек
+            usleep(900_000);
         }
+
+        Log::info('YandexMapsParser: done', ['count' => count($allReviews)]);
 
         return [
             'reviews' => $allReviews,
@@ -144,43 +138,34 @@ class YandexMapsParser
     // Приватные методы
     // -------------------------------------------------------------------------
 
-    /**
-     * Получить csrfToken через пустой POST-запрос на endpoint.
-     *
-     * Яндекс при любом запросе без корректного токена возвращает 200 с JSON:
-     * {"csrfToken": "...", "statusCode": 403}
-     *
-     * Этот токен затем принимается в следующем запросе.
-     */
-    private function fetchCsrfTokenViaPost(): ?string
+    private function fetchCsrfTokenViaPost(string $businessId = null): ?string
     {
         try {
-            $response = $this->client->post(self::REVIEWS_EP);
-            $data = json_decode((string) $response->getBody(), true);
+            // Заходим на страницу организации — получаем нужные cookie
+            if ($businessId) {
+                $this->client->get("/maps/org/{$businessId}/reviews/");
+            }
 
-            if (!empty($data['csrfToken'])) {
+            $response = $this->client->post(self::REVIEWS_EP);
+            $data     = json_decode((string) $response->getBody(), true);
+
+            if (! empty($data['csrfToken'])) {
                 return $data['csrfToken'];
             }
         } catch (\Exception $e) {
-            Log::error('YandexMapsParser: POST за токеном упал', [
-                'error' => $e->getMessage(),
-            ]);
+            Log::error('YandexMapsParser: POST token failed', ['error' => $e->getMessage()]);
         }
 
-        // Запасной план: вытащить из HTML страницы
-        return $this->fetchCsrfTokenFromHtml();
+        return $this->fetchCsrfTokenFromHtml($businessId);
     }
 
-    /**
-     * Запасной способ: загрузить HTML и вытащить csrfToken регуляркой.
-     */
-    private function fetchCsrfTokenFromHtml(): ?string
+    private function fetchCsrfTokenFromHtml(string $businessId = null): ?string
     {
         try {
-            $response = $this->client->get('/maps/');
+            $url      = $businessId ? "/maps/org/{$businessId}/reviews/" : '/maps/';
+            $response = $this->client->get($url);
             $html     = (string) $response->getBody();
 
-            // window.__REDUX_STATE__ или data-attribute
             foreach ([
                          '/"csrfToken"\s*:\s*"([^"]+)"/',
                          '/csrfToken["\s:=]+([a-f0-9:]+)/',
@@ -190,9 +175,7 @@ class YandexMapsParser
                 }
             }
         } catch (\Exception $e) {
-            Log::error('YandexMapsParser: HTML fallback упал', [
-                'error' => $e->getMessage(),
-            ]);
+            Log::error('YandexMapsParser: HTML token failed', ['error' => $e->getMessage()]);
         }
 
         return null;
@@ -200,54 +183,61 @@ class YandexMapsParser
 
     /**
      * Загрузить одну страницу отзывов.
+     *
+     * Параметры строго в алфавитном порядке ключей — критично для s_hash:
+     * ajax < businessId < csrfToken < locale < page < pageSize < ranking < reqId < sessionId
      */
     private function fetchPage(
         string $businessId,
         string $csrfToken,
         string $sessionId,
         string $reqId,
-        int    $page
+        int $page
     ): array {
-        // ВАЖНО: параметры должны идти в алфавитном порядке ключей,
-        // именно из этой строки считается s_hash.
         $params = [
             'ajax'       => '1',
             'businessId' => $businessId,
             'csrfToken'  => $csrfToken,
             'locale'     => 'ru_RU',
-            'page'       => (string) $page,
-            'pageSize'   => '10',
-            'ranking'    => 'by_time',   // by_time | by_rating
-            'reqId'      => $reqId,
+            'page'       => (string) ($page + 1), // Яндекс считает страницы с 1
+            'pageSize'   => '50',                  // максимум, снижает число запросов
+            'ranking'    => 'by_time',
+            'reqId'      => $reqId,                // ОБЯЗАТЕЛЕН — без него 500
             'sessionId'  => $sessionId,
         ];
 
-        // Строка для хэша — ключи уже отсортированы алфавитно в массиве выше
+        // Строка для хэша — ключи уже в алфавитном порядке
         $queryString = http_build_query($params);
         $s           = $this->computeSHash($queryString);
 
+        Log::info('YandexMapsParser: s_hash input', ['qs' => $queryString, 's' => $s]);
+
         $response = $this->client->get(self::REVIEWS_EP, [
-            'query' => array_merge($params, ['s' => $s]),
+            'query'   => array_merge($params, ['s' => $s]),
+            'headers' => [
+                'Referer' => "https://yandex.ru/maps/org/{$businessId}/reviews/",
+            ],
         ]);
 
-        $data = json_decode((string) $response->getBody(), true);
+        $body = (string) $response->getBody();
+        Log::info('YandexMapsParser: response', ['body' => substr($body, 0, 500)]);
+
+        $data = json_decode($body, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \RuntimeException('Яндекс вернул невалидный JSON');
+            throw new \RuntimeException('Невалидный JSON: '.substr($body, 0, 200));
         }
 
-        // Если токен протух — Яндекс вернёт новый в теле ответа
-        if (!empty($data['csrfToken']) && isset($data['statusCode']) && $data['statusCode'] === 403) {
-            throw new \RuntimeException('CSRF-токен устарел, нужно обновить');
+        if (! empty($data['csrfToken']) && ($data['statusCode'] ?? null) === 403) {
+            throw new \RuntimeException('CSRF-токен устарел');
         }
 
         return $data;
     }
 
     /**
-     * Алгоритм s_hash — djb2 xor, беззнаковый 32-бит.
+     * djb2 xor — точная копия JavaScript hashFunction из исходников Яндекса:
      *
-     * JavaScript-оригинал:
      *   function hashFunction(e) {
      *       var t = e.length, n = 5381;
      *       for (var r = 0; r < t; r++) { n = (33 * n) ^ e.charCodeAt(r); }
@@ -256,30 +246,26 @@ class YandexMapsParser
      */
     private function computeSHash(string $queryString): string
     {
-        $n = 5381;
+        $n   = 5381;
         $len = strlen($queryString);
 
         for ($i = 0; $i < $len; $i++) {
-            // (33 * n) ^ charCode — потом усекаем до 32 бит
             $n = ((33 * $n) ^ ord($queryString[$i])) & 0xFFFFFFFF;
         }
 
-        // Аналог >>> 0 в JS (беззнаковый сдвиг = беззнаковое 32-бит целое)
+        // >>> 0 в JS = беззнаковое 32-бит целое
         return (string) ($n < 0 ? $n + 0x100000000 : $n);
     }
 
-    /**
-     * Нормализовать один отзыв из JSON в плоский массив для БД.
-     */
     private function mapReview(array $r): array
     {
         return [
-            'yandex_review_id' => (string) ($r['id']               ?? uniqid('r_', true)),
-            'author_name'      => $r['author']['name']              ?? 'Аноним',
-            'author_phone'     => $r['author']['publicName']        ?? null,
-            'branch_name'      => $r['branchName']                  ?? null,
-            'rating'           => (int) ($r['rating']               ?? 0),
-            'text'             => $r['text']                         ?? null,
+            'yandex_review_id' => (string) ($r['id'] ?? uniqid('r_', true)),
+            'author_name'      => $r['author']['name']       ?? 'Аноним',
+            'author_phone'     => $r['author']['publicName'] ?? null,
+            'branch_name'      => $r['branchName']            ?? null,
+            'rating'           => (int) ($r['rating']         ?? 0),
+            'text'             => $r['text']                   ?? null,
             'published_at'     => isset($r['updatedTime'])
                 ? date('Y-m-d H:i:s', (int) $r['updatedTime'])
                 : null,

@@ -10,6 +10,24 @@
         {{ $page.props.flash.success }}
       </div>
 
+      <!-- Статус синхронизации -->
+      <div v-if="setting?.sync_status" class="mb-6 p-4 rounded-lg border text-sm"
+           :class="{
+             'bg-blue-50 border-blue-200 text-blue-700': setting.sync_status === 'syncing' || setting.sync_status === 'pending',
+             'bg-green-50 border-green-200 text-green-700': setting.sync_status === 'completed',
+             'bg-red-50 border-red-200 text-red-700': setting.sync_status === 'failed'
+           }">
+        <div class="flex items-center gap-2 font-medium mb-1">
+          <span v-if="setting.sync_status === 'syncing' || setting.sync_status === 'pending'">⏳ Синхронизация...</span>
+          <span v-else-if="setting.sync_status === 'completed'">✅ Синхронизация завершена</span>
+          <span v-else-if="setting.sync_status === 'failed'">❌ Ошибка синхронизации</span>
+        </div>
+        <p v-if="setting.sync_error" class="text-xs mt-1">{{ setting.sync_error }}</p>
+        <p v-if="setting.last_synced_at" class="text-xs opacity-75 mt-1">
+          Последнее обновление: {{ new Date(setting.last_synced_at).toLocaleString('ru-RU') }}
+        </p>
+      </div>
+
       <form @submit.prevent="save">
         <label class="block text-sm text-gray-500 mb-1">
           Укажите ссылку на Яндекс, пример
@@ -22,7 +40,7 @@
           v-model="form.maps_url"
           type="url"
           placeholder="https://yandex.ru/maps/org/samoye_populyarnoye_kafe/1010501395/reviews/"
-          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 mb-1"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-400 mb-1"
           :class="{ 'border-red-400': errors.maps_url }"
         />
 
