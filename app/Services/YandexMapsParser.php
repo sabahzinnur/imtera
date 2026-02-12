@@ -16,6 +16,10 @@ class YandexMapsParser
 
     private const REVIEWS_EP = '/maps/api/business/fetchReviews';
 
+    private float $extractedRating = 0.0;
+
+    private int $extractedVotes = 0;
+
     public function __construct()
     {
         $this->jar = new CookieJar;
@@ -24,9 +28,7 @@ class YandexMapsParser
             'base_uri' => self::BASE_URL,
             'timeout' => 20,
             'headers' => [
-                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                    .'AppleWebKit/537.36 (KHTML, like Gecko) '
-                    .'Chrome/120.0.0.0 Safari/537.36',
+                'User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
                 'Accept' => 'application/json, text/javascript, */*; q=0.01',
                 'Accept-Language' => 'ru-RU,ru;q=0.9',
                 'X-Requested-With' => 'XMLHttpRequest',
@@ -35,10 +37,6 @@ class YandexMapsParser
             'cookies' => $this->jar,
         ]);
     }
-
-    // -------------------------------------------------------------------------
-    // Публичные методы
-    // -------------------------------------------------------------------------
 
     /**
      * Извлечь businessId из URL Яндекс Карт.
@@ -63,7 +61,7 @@ class YandexMapsParser
         Log::info('YandexMapsParser: start', ['businessId' => $businessId]);
 
         try {
-            $csrfToken = $this->fetchCsrfTokenViaPost($businessId);
+            $csrfToken = $this->fetchCsrfToken($businessId);
 
             if (! $csrfToken) {
                 throw new \RuntimeException('Не удалось получить CSRF-токен');
@@ -74,17 +72,24 @@ class YandexMapsParser
             $reqId     = $ts.rand(100, 999).'-'.rand(100000000, 999999999).'-sas1-'.rand(1000, 9999);
 
             $allReviews = [];
-            $rating     = 0.0;
-            $total      = 0;
+            $rating     = $this->extractedRating;
+            $total      = $this->extractedVotes;
 
             for ($page = 0; $page < $maxPages; $page++) {
                 $result = $this->fetchPage($businessId, $csrfToken, $sessionId, $reqId, $page);
 
                 if (empty($result['data']['reviews'])) break;
 
+                // Если в JSON есть данные о рейтинге, берем их (они точнее)
                 if ($page === 0) {
-                    $rating = (float) ($result['data']['businessRating']['score'] ?? 0);
-                    $total  = (int)   ($result['data']['businessRating']['votes'] ?? 0);
+                    if (isset($result['data']['businessRating']['score'])) {
+                        $rating = (float) $result['data']['businessRating']['score'];
+                    }
+                    if (isset($result['data']['businessRating']['votes'])) {
+                        $total = (int) $result['data']['businessRating']['votes'];
+                    } elseif (isset($result['data']['params']['count'])) {
+                        $total = (int) $result['data']['params']['count'];
+                    }
                 }
 
                 foreach ($result['data']['reviews'] as $r) {
@@ -109,47 +114,26 @@ class YandexMapsParser
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Приватные методы
-    // -------------------------------------------------------------------------
-
-    private function fetchCsrfTokenViaPost(string $businessId = null): ?string
+    private function fetchCsrfToken(string $businessId): ?string
     {
         try {
-            if ($businessId) {
-                $this->client->get("/maps/org/{$businessId}/reviews/");
+            // Заходим на страницу организации для установки кук
+            $response = $this->client->get("/maps/org/{$businessId}/reviews/");
+            $html = (string) $response->getBody();
+
+            // Пытаемся вытащить рейтинг из HTML
+            if (preg_match('/"ratingValue"\s*:\s*"?([\d.]+)"?/', $html, $m)) {
+                $this->extractedRating = (float) $m[1];
+            }
+            if (preg_match('/"reviewCount"\s*:\s*"?(\d+)"?/', $html, $m)) {
+                $this->extractedVotes = (int) $m[1];
             }
 
-            $response = $this->client->post(self::REVIEWS_EP);
-            $data     = json_decode((string) $response->getBody(), true);
-
-            if (! empty($data['csrfToken'])) {
-                return $data['csrfToken'];
-            }
-        } catch (\Exception $e) {
-            Log::error('YandexMapsParser: POST token failed', ['error' => $e->getMessage()]);
-        }
-
-        return $this->fetchCsrfTokenFromHtml($businessId);
-    }
-
-    private function fetchCsrfTokenFromHtml(string $businessId = null): ?string
-    {
-        try {
-            $url      = $businessId ? "/maps/org/{$businessId}/reviews/" : '/maps/';
-            $response = $this->client->get($url);
-            $html     = (string) $response->getBody();
-
-            foreach ([
-                         '/"csrfToken"\s*:\s*"([^"]+)"/',
-                         '/csrfToken["\s:=]+([a-f0-9:]+)/',
-                     ] as $pattern) {
-                if (preg_match($pattern, $html, $m)) {
-                    return $m[1];
-                }
+            if (preg_match('/"csrfToken"\s*:\s*"([^"]+)"/', $html, $m)) {
+                return $m[1];
             }
         } catch (\Exception $e) {
-            Log::error('YandexMapsParser: HTML token failed', ['error' => $e->getMessage()]);
+            Log::error('YandexMapsParser: ошибка получения CSRF', ['error' => $e->getMessage()]);
         }
 
         return null;
