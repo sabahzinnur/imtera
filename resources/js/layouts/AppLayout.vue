@@ -39,9 +39,7 @@
                     class="rounded-2xl py-1.5 pl-8 text-sm  transition hover:bg-gray-100"
                     :class="{
                         'shadow-link bg-white':
-                            $page.url === '/' ||
-                            $page.url === '/dashboard' ||
-                            $page.url === '/reviews',
+                            $page.url === '/',
                     }"
                 >
                     Отзывы
@@ -95,9 +93,9 @@
     </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { Link } from '@inertiajs/vue3';
+import AppLogo from '@/components/AppLogo.vue';
 import { Separator } from '@/components/ui/separator';
 import { home, settings, logout } from '@/routes';
-import AppLogo from '@/components/AppLogo.vue';
 </script>

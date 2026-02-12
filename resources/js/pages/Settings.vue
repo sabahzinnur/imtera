@@ -53,7 +53,7 @@
   </AppLayout>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { router } from '@inertiajs/vue3'
 import { ref } from 'vue'
 import AppLayout from '@/layouts/AppLayout.vue'

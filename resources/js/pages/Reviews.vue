@@ -205,9 +205,9 @@
 
 <script setup>
 import { router, Link } from '@inertiajs/vue3';
+import { Separator } from '@/components/ui/separator/index.ts';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { settings, reviews as reviewsRoute } from '@/routes';
-import { Separator } from '@/components/ui/separator/index.ts';
 
 defineProps({
     reviews: Object,
