@@ -88,7 +88,7 @@
       </div>
 
       <!-- Блок рейтинга -->
-      <div v-if="setting?.rating" class="w-52 shrink-0">
+      <div v-if="setting?.maps_url" class="w-52 shrink-0">
         <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 sticky top-6">
           <div class="flex items-center gap-2 mb-2">
             <span class="text-4xl font-bold text-gray-900">{{ setting.rating }}</span>
