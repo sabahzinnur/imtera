@@ -80,7 +80,7 @@
                     >
                         <div class="mb-2 flex items-start justify-between">
                             <div
-                                class="flex items-center gap-3 text-sm text-gray-500"
+                                class="flex items-center gap-3 text-sm text-app font-bold"
                             >
                                 <span>{{ review.published_at }}</span>
                                 <span
