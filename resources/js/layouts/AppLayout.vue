@@ -93,7 +93,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import AppLogo from '@/components/AppLogo.vue';
 import { Separator } from '@/components/ui/separator';

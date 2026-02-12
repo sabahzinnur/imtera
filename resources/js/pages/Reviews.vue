@@ -73,67 +73,11 @@
 
                 <!-- Карточки -->
                 <div class="flex flex-col gap-3">
-                    <div
+                    <ReviewCard
                         v-for="review in reviews.data"
                         :key="review.id"
-                        class="rounded-xl border border-gray-100 bg-white p-5 shadow-sm"
-                    >
-                        <div class="mb-2 flex items-start justify-between">
-                            <div
-                                class="flex items-center gap-3 text-sm text-app font-bold"
-                            >
-                                <span>{{ review.published_at }}</span>
-                                <span
-                                    v-if="review.branch_name"
-                                    class="flex items-center gap-1"
-                                >
-                                    {{ review.branch_name }}
-                                    <svg
-                                        class="h-3.5 w-3.5 text-red-500"
-                                        fill="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"
-                                        />
-                                    </svg>
-                                </span>
-                            </div>
-                            <div class="flex gap-0.5">
-                                <svg
-                                    v-for="i in 5"
-                                    :key="i"
-                                    class="h-4 w-4"
-                                    :class="
-                                        i <= review.rating
-                                            ? 'text-yellow-400'
-                                            : 'text-gray-200'
-                                    "
-                                    fill="currentColor"
-                                    viewBox="0 0 20 20"
-                                >
-                                    <path
-                                        d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
-                                    />
-                                </svg>
-                            </div>
-                        </div>
-
-                        <div class="mb-2 flex items-center gap-3">
-                            <span class="text-sm font-semibold text-gray-800">{{
-                                review.author_name
-                            }}</span>
-                            <span
-                                v-if="review.author_phone"
-                                class="text-sm text-gray-400"
-                                >{{ review.author_phone }}</span
-                            >
-                        </div>
-
-                        <p class="text-sm leading-relaxed text-gray-600">
-                            {{ review.text }}
-                        </p>
-                    </div>
+                        :review="review"
+                    />
                 </div>
 
                 <!-- Пагинация -->
@@ -203,16 +147,27 @@
     </AppLayout>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { router, Link } from '@inertiajs/vue3';
+import ReviewCard from '@/components/ReviewCard.vue';
 import { Separator } from '@/components/ui/separator/index.ts';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { settings, reviews as reviewsRoute } from '@/routes';
+import { type Review } from '@/types';
 
-defineProps({
-    reviews: Object,
-    setting: Object,
-    sort: String,
-    isSyncing: Boolean,
-});
+defineProps<{
+    reviews: {
+        data: Review[];
+        current_page: number;
+        last_page: number;
+    };
+    setting: {
+        maps_url: string | null;
+        rating: number;
+        reviews_count: number;
+        sync_status: string;
+    } | null;
+    sort: string;
+    isSyncing: boolean;
+}>();
 </script>
