@@ -1,8 +1,5 @@
 <template>
   <AppLayout>
-    <h1 class="text-xl font-semibold text-gray-800 mb-6">Подключение площадок</h1>
-
-    <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 max-w-xl">
       <h2 class="font-semibold text-gray-700 mb-4">Подключить Яндекс</h2>
 
       <div v-if="$page.props.flash?.success"
@@ -48,18 +45,17 @@
 
         <button
           type="submit" :disabled="loading"
-          class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-5 py-2 rounded-lg transition mt-3"
+          class="bg-brand-blue hover:bg-blue-700 cursor-pointer disabled:opacity-50 text-white text-sm font-medium px-5 py-2 rounded-lg transition mt-3"
         >
           {{ loading ? 'Сохранение...' : 'Сохранить' }}
         </button>
       </form>
-    </div>
   </AppLayout>
 </template>
 
-<script setup>
-import { ref } from 'vue'
+<script setup lang="ts">
 import { router } from '@inertiajs/vue3'
+import { ref } from 'vue'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { settings } from '@/routes'
 

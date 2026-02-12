@@ -1,5 +1,5 @@
 @import 'tailwindcss';
-
+@import url('https://fonts.googleapis.com/css2?family=Mulish:ital,wght@0,200..1000;1,200..1000&display=swap');
 @import 'tw-animate-css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
@@ -9,6 +9,7 @@
 
 @theme inline {
     --font-sans:
+        'Mulish',
         Instrument Sans, ui-sans-serif, system-ui, sans-serif,
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
         'Noto Color Emoji';
@@ -87,6 +88,29 @@
             'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
             'Noto Color Emoji';
     }
+    .shadow-link {
+        box-shadow: 0 2px 1px 0 rgba(0, 0, 0, 0.02);
+    }
+
+    .shadow-panel {
+        box-shadow: 0 4px 3px 0 rgba(229, 229, 229, 1);
+    }
+    .bg-panel {
+        background-color: #F6F8FA;
+    }
+    .bg-brand-blue {
+        background-color: #339AF0;
+    }
+    .bg-brand-red {
+        background-color: #FF4433;
+    }
+    .border-panel {
+        border: 1px solid rgba(220, 228, 234, 1);
+    }
+    .text-app {
+        color: #363740;
+    }
+
 }
 
 :root {

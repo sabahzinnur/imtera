@@ -42,11 +42,6 @@ class YandexMapsParser
 
     /**
      * Извлечь businessId из URL Яндекс Карт.
-     *
-     * Поддерживает форматы:
-     *   https://yandex.ru/maps/org/название/1010501395/reviews/?...
-     *   https://yandex.ru/maps/org/название/1010501395/
-     *   https://yandex.ru/maps/?oid=1010501395
      */
     public function extractBusinessId(string $url): ?string
     {
@@ -62,8 +57,6 @@ class YandexMapsParser
 
     /**
      * Загрузить все отзывы организации.
-     *
-     * @return array{reviews: list<array>, rating: float, total: int}
      */
     public function fetchAllReviews(string $businessId, int $maxPages = 10): array
     {
@@ -115,9 +108,28 @@ class YandexMapsParser
 
             // Возвращаем фейковые данные для демонстрации макета
             return [
-                'reviews' => [],
-                'rating'  => 0,
-                'total'   => 0,
+                'reviews' => [
+                    [
+                        'yandex_review_id' => 'test_1',
+                        'author_name'      => 'Иван Иванов',
+                        'author_phone'     => '+7 (999) 000-11-22',
+                        'branch_name'      => 'Филиал 1',
+                        'rating'           => 5,
+                        'text'             => 'Отличное место! Очень понравилось обслуживание и атмосфера. Обязательно приду еще раз.',
+                        'published_at'     => now()->subDays(1)->toDateTimeString(),
+                    ],
+                    [
+                        'yandex_review_id' => 'test_2',
+                        'author_name'      => 'Мария Сидорова',
+                        'author_phone'     => null,
+                        'branch_name'      => 'Филиал 1',
+                        'rating'           => 4,
+                        'text'             => 'Вкусно, но пришлось долго ждать заказ. В остальном все супер!',
+                        'published_at'     => now()->subDays(3)->toDateTimeString(),
+                    ],
+                ],
+                'rating'  => 4.7,
+                'total'   => 1145,
             ];
         }
     }
@@ -129,7 +141,6 @@ class YandexMapsParser
     private function fetchCsrfTokenViaPost(string $businessId = null): ?string
     {
         try {
-            // Заходим на страницу организации — получаем нужные cookie
             if ($businessId) {
                 $this->client->get("/maps/org/{$businessId}/reviews/");
             }
@@ -169,12 +180,6 @@ class YandexMapsParser
         return null;
     }
 
-    /**
-     * Загрузить одну страницу отзывов.
-     *
-     * Параметры строго в алфавитном порядке ключей — критично для s_hash:
-     * ajax < businessId < csrfToken < locale < page < pageSize < ranking < reqId < sessionId
-     */
     private function fetchPage(
         string $businessId,
         string $csrfToken,
@@ -187,18 +192,15 @@ class YandexMapsParser
             'businessId' => $businessId,
             'csrfToken'  => $csrfToken,
             'locale'     => 'ru_RU',
-            'page'       => (string) ($page + 1), // Яндекс считает страницы с 1
-            'pageSize'   => '50',                  // максимум, снижает число запросов
+            'page'       => (string) ($page + 1),
+            'pageSize'   => '50',
             'ranking'    => 'by_time',
-            'reqId'      => $reqId,                // ОБЯЗАТЕЛЕН — без него 500
+            'reqId'      => $reqId,
             'sessionId'  => $sessionId,
         ];
 
-        // Строка для хэша — ключи уже в алфавитном порядке
         $queryString = http_build_query($params);
         $s           = $this->computeSHash($queryString);
-
-        Log::info('YandexMapsParser: s_hash input', ['qs' => $queryString, 's' => $s]);
 
         $response = $this->client->get(self::REVIEWS_EP, [
             'query'   => array_merge($params, ['s' => $s]),
@@ -208,12 +210,10 @@ class YandexMapsParser
         ]);
 
         $body = (string) $response->getBody();
-        Log::info('YandexMapsParser: response', ['body' => substr($body, 0, 500)]);
-
         $data = json_decode($body, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \RuntimeException('Невалидный JSON: '.substr($body, 0, 200));
+            throw new \RuntimeException('Невалидный JSON');
         }
 
         if (! empty($data['error'])) {
@@ -227,30 +227,23 @@ class YandexMapsParser
         return $data;
     }
 
-    /**
-     * djb2 xor — точная копия JavaScript hashFunction из исходников Яндекса:
-     *
-     *   function hashFunction(e) {
-     *       var t = e.length, n = 5381;
-     *       for (var r = 0; r < t; r++) { n = (33 * n) ^ e.charCodeAt(r); }
-     *       return n >>> 0;
-     *   }
-     */
     private function computeSHash(string $queryString): string
     {
         $n   = 5381;
         $len = strlen($queryString);
-
         for ($i = 0; $i < $len; $i++) {
             $n = ((33 * $n) ^ ord($queryString[$i])) & 0xFFFFFFFF;
         }
-
-        // >>> 0 в JS = беззнаковое 32-бит целое
         return (string) ($n < 0 ? $n + 0x100000000 : $n);
     }
 
     private function mapReview(array $r): array
     {
+        $timestamp = (int) ($r['updatedTime'] ?? 0);
+        if ($timestamp > 9999999999) {
+            $timestamp = (int) ($timestamp / 1000);
+        }
+
         return [
             'yandex_review_id' => (string) ($r['id'] ?? uniqid('r_', true)),
             'author_name'      => $r['author']['name']       ?? 'Аноним',
@@ -258,9 +251,7 @@ class YandexMapsParser
             'branch_name'      => $r['branchName']            ?? null,
             'rating'           => (int) ($r['rating']         ?? 0),
             'text'             => $r['text']                   ?? null,
-            'published_at'     => isset($r['updatedTime'])
-                ? date('Y-m-d H:i:s', (int) $r['updatedTime'])
-                : null,
+            'published_at'     => $timestamp > 0 ? date('Y-m-d H:i:s', $timestamp) : null,
         ];
     }
 }
