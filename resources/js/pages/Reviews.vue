@@ -3,25 +3,7 @@
         <div class="flex gap-6">
             <!-- Список отзывов -->
             <div class="flex-1">
-                <!-- Бейдж -->
-                <div class="mb-4 flex items-center gap-2">
-                    <span
-                        class="border-panel text-app inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-sm font-medium"
-                    >
-                        <svg
-                            class="h-4 w-4"
-                            fill="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                class="bg-brand-red"
-                                fill="#FF4433"
-                                d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z"
-                            />
-                        </svg>
-                        Яндекс Карты
-                    </span>
-                </div>
+                <YandexMapsBadge />
 
                 <!-- Идёт синхронизация -->
                 <div
@@ -55,15 +37,7 @@
                 >
                     <select
                         :value="sort"
-                        @change="
-                            (e) =>
-                                router.get(
-                                    reviewsRoute.url({
-                                        query: { sort: e.target.value },
-                                    }),
-                                    { preserveState: true },
-                                )
-                        "
+                        @change="handleSortChange"
                         class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-300 focus:outline-none"
                     >
                         <option value="newest">Сначала новые</option>
@@ -151,6 +125,7 @@
 import { router, Link } from '@inertiajs/vue3';
 import ReviewCard from '@/components/ReviewCard.vue';
 import { Separator } from '@/components/ui/separator/index.ts';
+import YandexMapsBadge from '@/components/YandexMapsBadge.vue';
 import { usePolling } from '@/composables/usePolling';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { settings, reviews as reviewsRoute } from '@/routes';
@@ -175,4 +150,14 @@ const props = defineProps<{
 usePolling(() => props.isSyncing, {
     only: ['reviews', 'setting', 'isSyncing'],
 });
+
+const handleSortChange = (e: Event) => {
+    const target = e.target as HTMLSelectElement;
+    router.get(
+        reviewsRoute.url({
+            query: { sort: target.value },
+        }),
+        { preserveState: true },
+    );
+};
 </script>
