@@ -104,33 +104,8 @@ class YandexMapsParser
             ];
 
         } catch (\Exception $e) {
-            Log::warning('YandexMapsParser: используя тестовые данные из-за ошибки', ['error' => $e->getMessage()]);
-
-            // Возвращаем фейковые данные для демонстрации макета
-            return [
-                'reviews' => [
-                    [
-                        'yandex_review_id' => 'test_1',
-                        'author_name'      => 'Иван Иванов',
-                        'author_phone'     => '+7 (999) 000-11-22',
-                        'branch_name'      => 'Филиал 1',
-                        'rating'           => 5,
-                        'text'             => 'Отличное место! Очень понравилось обслуживание и атмосфера. Обязательно приду еще раз.',
-                        'published_at'     => now()->subDays(1)->toDateTimeString(),
-                    ],
-                    [
-                        'yandex_review_id' => 'test_2',
-                        'author_name'      => 'Мария Сидорова',
-                        'author_phone'     => null,
-                        'branch_name'      => 'Филиал 1',
-                        'rating'           => 4,
-                        'text'             => 'Вкусно, но пришлось долго ждать заказ. В остальном все супер!',
-                        'published_at'     => now()->subDays(3)->toDateTimeString(),
-                    ],
-                ],
-                'rating'  => 4.7,
-                'total'   => 1145,
-            ];
+            Log::error('YandexMapsParser failed', ['error' => $e->getMessage()]);
+            throw $e;
         }
     }
 
@@ -239,19 +214,19 @@ class YandexMapsParser
 
     private function mapReview(array $r): array
     {
-        $timestamp = (int) ($r['updatedTime'] ?? 0);
-        if ($timestamp > 9999999999) {
-            $timestamp = (int) ($timestamp / 1000);
+        $publishedAt = null;
+        if (! empty($r['updatedTime'])) {
+            $publishedAt = date('Y-m-d H:i:s', strtotime($r['updatedTime']));
         }
 
         return [
-            'yandex_review_id' => (string) ($r['id'] ?? uniqid('r_', true)),
+            'yandex_review_id' => (string) ($r['reviewId'] ?? $r['id'] ?? uniqid('r_', true)),
             'author_name'      => $r['author']['name']       ?? 'Аноним',
             'author_phone'     => $r['author']['publicName'] ?? null,
             'branch_name'      => $r['branchName']            ?? null,
             'rating'           => (int) ($r['rating']         ?? 0),
             'text'             => $r['text']                   ?? null,
-            'published_at'     => $timestamp > 0 ? date('Y-m-d H:i:s', $timestamp) : null,
+            'published_at'     => $publishedAt,
         ];
     }
 }
