@@ -151,11 +151,12 @@
 import { router, Link } from '@inertiajs/vue3';
 import ReviewCard from '@/components/ReviewCard.vue';
 import { Separator } from '@/components/ui/separator/index.ts';
+import { usePolling } from '@/composables/usePolling';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { settings, reviews as reviewsRoute } from '@/routes';
 import { type Review } from '@/types';
 
-defineProps<{
+const props = defineProps<{
     reviews: {
         data: Review[];
         current_page: number;
@@ -170,4 +171,8 @@ defineProps<{
     sort: string;
     isSyncing: boolean;
 }>();
+
+usePolling(() => props.isSyncing, {
+    only: ['reviews', 'setting', 'isSyncing'],
+});
 </script>

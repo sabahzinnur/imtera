@@ -54,23 +54,45 @@
 </template>
 
 <script setup lang="ts">
-import { router } from '@inertiajs/vue3'
-import { ref } from 'vue'
-import AppLayout from '@/layouts/AppLayout.vue'
-import { settings } from '@/routes'
+import { router } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { usePolling } from '@/composables/usePolling';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { settings } from '@/routes';
 
-const props   = defineProps({ setting: Object })
-const form    = ref({ maps_url: props.setting?.maps_url ?? '' })
-const errors  = ref({})
-const loading = ref(false)
+const props = defineProps<{
+    setting: {
+        maps_url: string | null;
+        sync_status: string;
+        sync_error: string | null;
+        last_synced_at: string | null;
+    } | null;
+}>();
+
+const form = ref({ maps_url: props.setting?.maps_url ?? '' });
+const errors = ref<Record<string, any>>({});
+const loading = ref(false);
+
+const isSyncing = computed(() => {
+    return !!(
+        props.setting &&
+        ['pending', 'syncing'].includes(props.setting.sync_status)
+    );
+});
+
+usePolling(isSyncing, { only: ['setting'] });
 
 function save() {
-  errors.value  = {}
-  loading.value = true
+    errors.value = {};
+    loading.value = true;
 
-  router.post(settings.url(), form.value, {
-    onError:  (e) => { errors.value = e },
-    onFinish: () => { loading.value = false },
-  })
+    router.post(settings.url(), form.value, {
+        onError: (e) => {
+            errors.value = e;
+        },
+        onFinish: () => {
+            loading.value = false;
+        },
+    });
 }
 </script>
