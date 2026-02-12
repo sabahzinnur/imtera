@@ -55,28 +55,20 @@
                 </div>
 
                 <!-- Пагинация -->
-                <div
-                    v-if="reviews.last_page > 1"
-                    class="mt-6 flex justify-center gap-2"
-                >
-                    <button
-                        v-for="page in reviews.last_page"
-                        :key="page"
-                        @click="
-                            router.get(
-                                reviewsRoute.url({ query: { page, sort } }),
-                                { preserveState: true },
-                            )
+                <div class="mt-6">
+                    <Pagination
+                        :current-page="reviews.current_page"
+                        :last-page="reviews.last_page"
+                        @change="
+                            (page: number) =>
+                                router.get(
+                                    reviewsRoute.url({
+                                        query: { page, sort },
+                                    }),
+                                    { preserveState: true },
+                                )
                         "
-                        class="h-9 w-9 rounded-lg text-sm font-medium transition"
-                        :class="
-                            page === reviews.current_page
-                                ? 'bg-blue-600 text-white'
-                                : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
-                        "
-                    >
-                        {{ page }}
-                    </button>
+                    />
                 </div>
             </div>
 
@@ -124,6 +116,7 @@
 <script setup lang="ts">
 import { router, Link } from '@inertiajs/vue3';
 import ReviewCard from '@/components/ReviewCard.vue';
+import { Pagination } from '@/components/ui/pagination';
 import { Separator } from '@/components/ui/separator/index.ts';
 import YandexMapsBadge from '@/components/YandexMapsBadge.vue';
 import { usePolling } from '@/composables/usePolling';
