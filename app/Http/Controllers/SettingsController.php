@@ -2,47 +2,43 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Settings\YandexSettingsSaveRequest;
 use App\Jobs\SyncYandexReviews;
-use App\Models\YandexSetting;
 use App\Services\YandexMapsParser;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class SettingsController extends Controller
 {
+    /**
+     * Display the settings page.
+     */
     public function index(): Response
     {
-        $setting = YandexSetting::where('user_id', auth()->id())->first();
-
         return Inertia::render('Settings', [
-            'setting' => $setting,
+            'setting' => auth()->user()->yandexSetting,
         ]);
     }
 
-    public function save(Request $request, YandexMapsParser $parser): RedirectResponse
+    /**
+     * Save the Yandex Maps settings and trigger synchronization.
+     */
+    public function save(YandexSettingsSaveRequest $request, YandexMapsParser $parser): RedirectResponse
     {
-        $request->validate([
-            'maps_url' => ['required', 'url', 'regex:/yandex\.(ru|com)\/maps/'],
-        ], [
-            'maps_url.required' => 'Введите ссылку',
-            'maps_url.url' => 'Введите корректную ссылку',
-            'maps_url.regex' => 'Ссылка должна быть с Яндекс Карт',
-        ]);
-
-        $businessId = $parser->extractBusinessId($request->maps_url);
+        $businessId = $parser->extractBusinessId($request->validated('maps_url'));
 
         if (! $businessId) {
-            return back()->withErrors([
-                'maps_url' => 'Не удалось извлечь ID организации. Проверьте формат ссылки.',
+            throw ValidationException::withMessages([
+                'maps_url' => __('Не удалось извлечь ID организации. Проверьте формат ссылки.'),
             ]);
         }
 
-        YandexSetting::updateOrCreate(
+        auth()->user()->yandexSetting()->updateOrCreate(
             ['user_id' => auth()->id()],
             [
-                'maps_url' => $request->maps_url,
+                'maps_url' => $request->validated('maps_url'),
                 'business_id' => $businessId,
                 'sync_status' => 'pending',
                 'sync_error' => null,
@@ -51,6 +47,6 @@ class SettingsController extends Controller
 
         SyncYandexReviews::dispatch(auth()->id());
 
-        return back()->with('success', 'Настройки сохранены. Синхронизация отзывов запущена.');
+        return back()->with('success', __('Настройки сохранены. Синхронизация отзывов запущена.'));
     }
 }

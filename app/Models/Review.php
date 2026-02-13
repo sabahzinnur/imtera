@@ -30,4 +30,15 @@ class Review extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    /**
+     * Scope a query to sort reviews.
+     */
+    public function scopeSorted($query, string $sort = 'newest')
+    {
+        return $query->when($sort === 'oldest',
+            fn ($q) => $q->orderBy('published_at', 'asc'),
+            fn ($q) => $q->orderBy('published_at', 'desc')
+        );
+    }
 }

@@ -31,4 +31,12 @@ class YandexSetting extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    /**
+     * Check if the reviews are currently being synced.
+     */
+    public function isSyncing(): bool
+    {
+        return in_array($this->sync_status, ['pending', 'syncing']);
+    }
 }
