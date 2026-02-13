@@ -41,6 +41,16 @@ HOST_PORT=8000 docker compose up -d
 ```
 *Контейнер сам установит зависимости при первом запуске.*
 
+После запуска контейнеров выполните миграции:
+```bash
+docker compose exec app php artisan migrate
+```
+
+Для работы синхронизации отзывов запустите воркер очереди:
+```bash
+docker compose exec app php artisan queue:listen
+```
+
 ---
 
 ## Запуск в Production (Docker)
@@ -59,6 +69,16 @@ HOST_PORT=8000 docker compose up -d
    HOST_PORT=80 docker compose -f docker-compose.prod.yml up -d --build
    ```
    *Вы можете изменить `HOST_PORT`, если хотите запустить приложение на другом порту хоста.*
+
+3. Выполните миграции:
+   ```bash
+   docker compose -f docker-compose.prod.yml exec app php artisan migrate --force
+   ```
+
+4. Запустите обработчик очередей (в фоне):
+   ```bash
+   docker compose -f docker-compose.prod.yml exec -d app php artisan queue:work
+   ```
 
 ### Используемые образы:
 - **app**: Сборка на основе `Dockerfile.prod` (PHP-FPM + оптимизированный автозагрузчик).
