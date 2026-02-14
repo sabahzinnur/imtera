@@ -19,6 +19,7 @@ class ReviewsController extends Controller
         $user = auth()->user();
         $setting = $user->yandexSetting;
         $sort = $request->query('sort', 'newest');
+        $perPage = (int) $request->query('per_page', 50);
 
         if ($setting && $setting->business_id && ! $setting->isSyncing()) {
             $lastSynced = $setting->last_synced_at;
@@ -29,7 +30,8 @@ class ReviewsController extends Controller
 
         $reviews = Review::where('user_id', $user->id)
             ->sorted($sort)
-            ->paginate(50)
+            ->paginate($perPage)
+            ->withQueryString()
             ->through(fn (Review $review) => [
                 'id' => $review->id,
                 'author_name' => $review->author_name,
@@ -44,6 +46,7 @@ class ReviewsController extends Controller
             'reviews' => $reviews,
             'setting' => $setting,
             'sort' => $sort,
+            'perPage' => $perPage,
             'isSyncing' => $setting?->isSyncing() ?? false,
         ]);
     }

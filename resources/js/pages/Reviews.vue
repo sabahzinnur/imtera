@@ -18,6 +18,17 @@
                     </Button>
                 </div>
 
+                <!-- Пагинация сверху -->
+                <div v-if="reviews.data.length" class="mb-6">
+                    <Pagination
+                        :current-page="reviews.current_page"
+                        :last-page="reviews.last_page"
+                        :per-page="perPage"
+                        @change="handlePageChange"
+                        @perPageChange="handlePerPageChange"
+                    />
+                </div>
+
                 <!-- Идёт синхронизация -->
                 <div
                     v-if="isSyncing"
@@ -80,15 +91,9 @@
                     <Pagination
                         :current-page="reviews.current_page"
                         :last-page="reviews.last_page"
-                        @change="
-                            (page: number) =>
-                                router.get(
-                                    reviewsRoute.url({
-                                        query: { page, sort },
-                                    }),
-                                    { preserveState: true },
-                                )
-                        "
+                        :per-page="perPage"
+                        @change="handlePageChange"
+                        @perPageChange="handlePerPageChange"
                     />
                 </div>
             </div>
@@ -162,6 +167,7 @@ const props = defineProps<{
         sync_status: string;
     } | null;
     sort: string;
+    perPage: number;
     isSyncing: boolean;
 }>();
 
@@ -169,13 +175,31 @@ usePolling(() => props.isSyncing, {
     only: ['reviews', 'setting', 'isSyncing'],
 });
 
+const handlePageChange = (page: number) => {
+    router.get(
+        reviewsRoute.url({
+            query: { page, sort: props.sort, per_page: props.perPage },
+        }),
+        { preserveState: true, preserveScroll: true },
+    );
+};
+
+const handlePerPageChange = (perPage: number) => {
+    router.get(
+        reviewsRoute.url({
+            query: { page: 1, sort: props.sort, per_page: perPage },
+        }),
+        { preserveState: true, preserveScroll: true },
+    );
+};
+
 const handleSortChange = (e: Event) => {
     const target = e.target as HTMLSelectElement;
     router.get(
         reviewsRoute.url({
-            query: { sort: target.value },
+            query: { page: 1, sort: target.value, per_page: props.perPage },
         }),
-        { preserveState: true },
+        { preserveState: true, preserveScroll: true },
     );
 };
 
