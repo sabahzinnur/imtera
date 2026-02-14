@@ -3,17 +3,20 @@
         <div class="flex gap-6">
             <!-- Список отзывов -->
             <div class="flex-1">
-                <div class="flex items-center justify-between mb-4">
+                <div class="mb-4 flex items-center justify-between">
                     <YandexMapsBadge />
-                    
+
                     <Button
                         v-if="setting?.maps_url"
-                        variant="outline"
+                        class="bg-brand-blue mt-3 cursor-pointer rounded-lg px-5 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
                         size="sm"
                         :disabled="isSyncing"
                         @click="handleSync"
                     >
-                        <RefreshCw :class="{ 'animate-spin': isSyncing }" class="h-4 w-4 mr-2" />
+                        <RefreshCw
+                            :class="{ 'animate-spin': isSyncing }"
+                            class="mr-2 h-4 w-4"
+                        />
                         Обновить
                     </Button>
                 </div>
@@ -43,7 +46,9 @@
                     v-if="setting?.sync_status === 'aborted'"
                     class="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-700"
                 >
-                    ⚠️ Синхронизация была прервана Яндекс Картами (возможно, из-за частых запросов). Часть отзывов могла быть не загружена. Попробуйте позже.
+                    ⚠️ Синхронизация была прервана Яндекс Картами (возможно,
+                    из-за частых запросов). Часть отзывов могла быть не
+                    загружена. Попробуйте позже.
                 </div>
 
                 <!-- Нет данных -->
@@ -87,7 +92,7 @@
                 </div>
 
                 <!-- Пагинация -->
-                <div class="mt-6">
+                <div v-if="reviews.data.length" class="mt-6">
                     <Pagination
                         :current-page="reviews.current_page"
                         :last-page="reviews.last_page"
@@ -204,8 +209,12 @@ const handleSortChange = (e: Event) => {
 };
 
 const handleSync = () => {
-    router.post(reviewsSync.sync.url(), {}, {
-        preserveScroll: true,
-    });
+    router.post(
+        reviewsSync.sync.url(),
+        {},
+        {
+            preserveScroll: true,
+        },
+    );
 };
 </script>
