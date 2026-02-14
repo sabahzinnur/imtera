@@ -33,13 +33,52 @@ class SyncYandexReviews implements ShouldQueue
             return;
         }
 
+        $currentCount = Review::where('user_id', $this->userId)->count();
+        $isFirstSync = ! $setting->last_synced_at || $currentCount === 0;
+
         $setting->update([
             'sync_status' => 'syncing',
             'sync_error' => null,
         ]);
 
         try {
-            $result = $parser->fetchAllReviews($setting->business_id);
+            if ($isFirstSync) {
+                // ПЕРВАЯ СИНХРОНИЗАЦИЯ: удаляем старое и качаем всё
+                Review::where('user_id', $this->userId)->delete();
+                $result = $parser->fetchAllReviews($setting->business_id, startPage: 0);
+            } elseif ($setting->sync_status === 'completed') {
+                // ПОЛУЧАЕМ ТОЛЬКО НОВЫЕ: если прошлая синхронизация была успешной
+                $lastReview = Review::where('user_id', $this->userId)
+                    ->orderBy('published_at', 'desc')
+                    ->first();
+
+                // Сначала проверяем первую страницу
+                $firstPage = $parser->fetchAllReviews(
+                    $setting->business_id,
+                    maxPages: 1,
+                    lastReviewId: $lastReview?->yandex_review_id
+                );
+
+                // Если количество не изменилось (требование 4) и есть старые отзывы, то завершаем
+                if ($setting->reviews_count > 0 && $setting->reviews_count === $firstPage['total']) {
+                    $setting->update([
+                        'last_synced_at' => now(),
+                        'sync_status' => 'completed',
+                    ]);
+
+                    return;
+                }
+
+                // Иначе качаем новые до последнего известного
+                $result = $parser->fetchAllReviews(
+                    $setting->business_id,
+                    lastReviewId: $lastReview?->yandex_review_id
+                );
+            } else {
+                // ПРОДОЛЖАЕМ: если прошлая была прервана или неудачна
+                $startPage = (int) floor($currentCount / 50);
+                $result = $parser->fetchAllReviews($setting->business_id, startPage: $startPage);
+            }
 
             DB::transaction(function () use ($result) {
                 foreach ($result['reviews'] as $data) {
@@ -57,7 +96,7 @@ class SyncYandexReviews implements ShouldQueue
                 'rating' => $result['rating'],
                 'reviews_count' => $result['total'],
                 'last_synced_at' => now(),
-                'sync_status' => 'completed',
+                'sync_status' => $result['is_aborted'] ? 'aborted' : 'completed',
             ]);
 
         } catch (\Exception $e) {

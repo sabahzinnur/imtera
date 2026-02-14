@@ -54,11 +54,15 @@ class YandexMapsParser
     }
 
     /**
-     * Загрузить все отзывы организации.
+     * Загрузить отзывы организации.
      */
-    public function fetchAllReviews(string $businessId, int $maxPages = 10): array
+    public function fetchAllReviews(string $businessId, int $maxPages = 1000, ?string $lastReviewId = null, int $startPage = 0): array
     {
-        Log::info('YandexMapsParser: start', ['businessId' => $businessId]);
+        Log::info('YandexMapsParser: start', [
+            'businessId' => $businessId,
+            'lastReviewId' => $lastReviewId,
+            'startPage' => $startPage,
+        ]);
 
         try {
             $csrfToken = $this->fetchCsrfToken($businessId);
@@ -74,16 +78,25 @@ class YandexMapsParser
             $allReviews = [];
             $rating = $this->extractedRating;
             $total = $this->extractedVotes;
+            $isAborted = false;
 
-            for ($page = 0; $page < $maxPages; $page++) {
-                $result = $this->fetchPage($businessId, $csrfToken, $sessionId, $reqId, $page);
+            for ($page = $startPage; $page < $maxPages; $page++) {
+                try {
+                    $result = $this->fetchPage($businessId, $csrfToken, $sessionId, $reqId, $page);
+                } catch (\Exception $e) {
+                    if (str_contains($e->getMessage(), '403') || str_contains($e->getMessage(), '429')) {
+                        $isAborted = true;
+                        break;
+                    }
+                    throw $e;
+                }
 
                 if (empty($result['data']['reviews'])) {
                     break;
                 }
 
                 // Если в JSON есть данные о рейтинге, берем их (они точнее)
-                if ($page === 0) {
+                if ($page === $startPage) {
                     if (isset($result['data']['businessRating']['score'])) {
                         $rating = (float) $result['data']['businessRating']['score'];
                     }
@@ -94,8 +107,18 @@ class YandexMapsParser
                     }
                 }
 
+                $pageHasLastReview = false;
                 foreach ($result['data']['reviews'] as $r) {
-                    $allReviews[] = $this->mapReview($r);
+                    $mapped = $this->mapReview($r);
+                    if ($lastReviewId && $mapped['yandex_review_id'] === $lastReviewId) {
+                        $pageHasLastReview = true;
+                        break;
+                    }
+                    $allReviews[] = $mapped;
+                }
+
+                if ($pageHasLastReview) {
+                    break;
                 }
 
                 $totalPages = (int) ($result['data']['pager']['total'] ?? 1);
@@ -103,13 +126,16 @@ class YandexMapsParser
                     break;
                 }
 
-                usleep(900_000);
+                if ($page + 1 < $maxPages) {
+                    sleep(5);
+                }
             }
 
             return [
                 'reviews' => $allReviews,
                 'rating' => $rating,
                 'total' => $total,
+                'is_aborted' => $isAborted,
             ];
 
         } catch (\Exception $e) {

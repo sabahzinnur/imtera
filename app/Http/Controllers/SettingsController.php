@@ -27,7 +27,17 @@ class SettingsController extends Controller
      */
     public function save(YandexSettingsSaveRequest $request, YandexMapsParser $parser): RedirectResponse
     {
-        $businessId = $parser->extractBusinessId($request->validated('maps_url'));
+        $user = auth()->user();
+        $setting = $user->yandexSetting;
+        $newUrl = $request->validated('maps_url');
+
+        if ($setting && $setting->maps_url === $newUrl) {
+            throw ValidationException::withMessages([
+                'maps_url' => __('Эта ссылка уже сохранена.'),
+            ]);
+        }
+
+        $businessId = $parser->extractBusinessId($newUrl);
 
         if (! $businessId) {
             throw ValidationException::withMessages([
@@ -35,17 +45,17 @@ class SettingsController extends Controller
             ]);
         }
 
-        auth()->user()->yandexSetting()->updateOrCreate(
-            ['user_id' => auth()->id()],
+        $user->yandexSetting()->updateOrCreate(
+            ['user_id' => $user->id],
             [
-                'maps_url' => $request->validated('maps_url'),
+                'maps_url' => $newUrl,
                 'business_id' => $businessId,
                 'sync_status' => 'pending',
                 'sync_error' => null,
             ]
         );
 
-        SyncYandexReviews::dispatch(auth()->id());
+        SyncYandexReviews::dispatch($user->id);
 
         return back()->with('success', __('Настройки сохранены. Синхронизация отзывов запущена.'));
     }

@@ -3,7 +3,20 @@
         <div class="flex gap-6">
             <!-- Список отзывов -->
             <div class="flex-1">
-                <YandexMapsBadge />
+                <div class="flex items-center justify-between mb-4">
+                    <YandexMapsBadge />
+                    
+                    <Button
+                        v-if="setting?.maps_url"
+                        variant="outline"
+                        size="sm"
+                        :disabled="isSyncing"
+                        @click="handleSync"
+                    >
+                        <RefreshCw :class="{ 'animate-spin': isSyncing }" class="h-4 w-4 mr-2" />
+                        Обновить
+                    </Button>
+                </div>
 
                 <!-- Идёт синхронизация -->
                 <div
@@ -14,9 +27,17 @@
                     несколько минут...
                 </div>
 
+                <!-- Прервано Яндексом -->
+                <div
+                    v-if="setting?.sync_status === 'aborted'"
+                    class="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-700"
+                >
+                    ⚠️ Синхронизация была прервана Яндекс Картами (возможно, из-за частых запросов). Часть отзывов могла быть не загружена. Попробуйте позже.
+                </div>
+
                 <!-- Нет данных -->
                 <div
-                    v-else-if="!reviews.data.length"
+                    v-else-if="!reviews.data.length && !isSyncing"
                     class="py-16 text-center text-gray-400"
                 >
                     <p v-if="!setting?.maps_url">
@@ -115,7 +136,9 @@
 
 <script setup lang="ts">
 import { router, Link } from '@inertiajs/vue3';
+import { RefreshCw } from 'lucide-vue-next';
 import ReviewCard from '@/components/ReviewCard.vue';
+import { Button } from '@/components/ui/button';
 import { Pagination } from '@/components/ui/pagination';
 import { Separator } from '@/components/ui/separator/index.ts';
 import YandexMapsBadge from '@/components/YandexMapsBadge.vue';
@@ -123,6 +146,8 @@ import { usePolling } from '@/composables/usePolling';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { settings, reviews as reviewsRoute } from '@/routes';
 import { type Review } from '@/types';
+
+import reviewsSync from '@/routes/reviews';
 
 const props = defineProps<{
     reviews: {
@@ -152,5 +177,11 @@ const handleSortChange = (e: Event) => {
         }),
         { preserveState: true },
     );
+};
+
+const handleSync = () => {
+    router.post(reviewsSync.sync.url(), {}, {
+        preserveScroll: true,
+    });
 };
 </script>

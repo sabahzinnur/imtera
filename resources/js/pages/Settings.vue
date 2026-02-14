@@ -12,12 +12,14 @@
            :class="{
              'bg-blue-50 border-blue-200 text-blue-700': setting.sync_status === 'syncing' || setting.sync_status === 'pending',
              'bg-green-50 border-green-200 text-green-700': setting.sync_status === 'completed',
-             'bg-red-50 border-red-200 text-red-700': setting.sync_status === 'failed'
+             'bg-red-50 border-red-200 text-red-700': setting.sync_status === 'failed',
+             'bg-yellow-50 border-yellow-200 text-yellow-700': setting.sync_status === 'aborted'
            }">
         <div class="flex items-center gap-2 font-medium mb-1">
           <span v-if="setting.sync_status === 'syncing' || setting.sync_status === 'pending'">⏳ Синхронизация...</span>
           <span v-else-if="setting.sync_status === 'completed'">✅ Синхронизация завершена</span>
           <span v-else-if="setting.sync_status === 'failed'">❌ Ошибка синхронизации</span>
+          <span v-else-if="setting.sync_status === 'aborted'">⚠️ Синхронизация прервана</span>
         </div>
         <p v-if="setting.sync_error" class="text-xs mt-1">{{ setting.sync_error }}</p>
         <p v-if="setting.last_synced_at" class="text-xs opacity-75 mt-1">

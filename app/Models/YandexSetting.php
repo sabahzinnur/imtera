@@ -39,4 +39,12 @@ class YandexSetting extends Model
     {
         return in_array($this->sync_status, ['pending', 'syncing']);
     }
+
+    /**
+     * Check if the sync was aborted.
+     */
+    public function isAborted(): bool
+    {
+        return $this->sync_status === 'aborted';
+    }
 }
