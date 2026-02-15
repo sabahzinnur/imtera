@@ -32,28 +32,16 @@
                     />
                 </div>
 
-                <!-- Идёт синхронизация -->
-                <div
-                    v-if="isSyncing"
-                    class="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-700"
-                >
-                    ⏳ Отзывы загружаются с Яндекс Карт, это может занять
-                    несколько минут...
-                </div>
-
-                <!-- Прервано Яндексом -->
-                <div
-                    v-if="setting?.sync_status === 'aborted'"
-                    class="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-700"
-                >
-                    ⚠️ Синхронизация была прервана Яндекс Картами (возможно,
-                    из-за частых запросов). Часть отзывов могла быть не
-                    загружена. Попробуйте позже.
-                </div>
+                <!-- Статус синхронизации -->
+                <SyncStatus
+                    :status="setting?.sync_status"
+                    :error="setting?.sync_error"
+                    :business-name="setting?.business_name"
+                />
 
                 <!-- Нет данных -->
                 <div
-                    v-else-if="!reviews.data.length && !isSyncing"
+                    v-if="!reviews.data.length && !isSyncing"
                     class="py-16 text-center text-gray-400"
                 >
                     <p v-if="!setting?.maps_url">
@@ -118,6 +106,7 @@ import { router, Link } from '@inertiajs/vue3';
 import { RefreshCw } from 'lucide-vue-next';
 import ReviewCard from '@/components/ReviewCard.vue';
 import RatingCard from '@/components/RatingCard.vue';
+import SyncStatus from '@/components/SyncStatus.vue';
 import { Button } from '@/components/ui/button';
 import { Pagination } from '@/components/ui/pagination';
 import YandexMapsBadge from '@/components/YandexMapsBadge.vue';
@@ -140,6 +129,7 @@ const props = defineProps<{
         rating: number;
         reviews_count: number;
         sync_status: string;
+        sync_error?: string | null;
     } | null;
     sort: string;
     perPage: number;

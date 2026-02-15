@@ -51,6 +51,7 @@ class ReviewsController extends Controller
                 'rating' => $setting->rating,
                 'reviews_count' => $setting->reviews_count,
                 'sync_status' => $setting->sync_status,
+                'sync_error' => $setting->sync_error,
                 'last_synced_at' => $setting->last_synced_at,
             ] : null,
             'sort' => $sort,
