@@ -21,8 +21,6 @@ class SyncYandexReviews implements ShouldQueue
 
     public int $timeout = 60;
 
-    private const MAX_PAGES = 12;
-
     public function __construct(
         public int $userId,
         public int $page = 0,
@@ -30,7 +28,7 @@ class SyncYandexReviews implements ShouldQueue
         public ?string $csrfToken = null,
         public ?string $sessionId = null,
         public ?string $reqId = null,
-        public array $cookies = []
+        public int $retryCount = 0
     ) {}
 
     public function handle(YandexMapsParser $parser): void
@@ -48,18 +46,19 @@ class SyncYandexReviews implements ShouldQueue
         $csrfToken = $this->csrfToken;
         $sessionId = $this->sessionId;
         $reqId = $this->reqId;
-        $cookies = $this->cookies;
 
         try {
-            if ($this->page === 0) {
+            // Инициализация сессии и параметров при первом запуске или если они отсутствуют
+            if ($this->page === 0 || !$sessionId || !$reqId) {
                 $isInterrupted = $setting->sync_status !== 'completed' &&
                                  $setting->sync_status !== 'pending' &&
                                  $setting->sync_page > 0;
 
-                if ($isInterrupted) {
+                if ($isInterrupted && $this->page === 0) {
                     $currentPage = $setting->sync_page;
-                } else {
-                    $currentPage = 0;
+                }
+
+                if ($this->page === 0 && !$isInterrupted) {
                     $setting->update([
                         'previous_sync_status' => $setting->sync_status,
                         'sync_page' => 0,
@@ -88,16 +87,43 @@ class SyncYandexReviews implements ShouldQueue
                 $csrfToken,
                 $currentPage,
                 $sessionId,
-                $reqId,
-                $cookies
+                $reqId
             );
 
             $result = $response['data'];
             $newCsrfToken = $response['csrfToken'];
-            $newCookies = $response['cookies'];
             $newRating = $result['rating'] ?: $response['rating'];
             $newVotes = $result['total'] ?: $response['votes'];
             $businessName = $response['businessName'];
+            
+            // Вычисляем общее кол-во страниц, приоритет: JSON -> HTML -> DB
+            $totalPages = $result['totalPages'] ?: (int) ceil($newVotes / 50) ?: $setting->total_pages;
+
+            // Если отзывы пусты, но мы знаем что они должны быть - пробуем перезапустить
+            if (empty($result['reviews']) && ($currentPage < ($totalPages - 1) || ($currentPage === 0 && $newVotes > 0))) {
+                if ($this->retryCount < 1) {
+                    Log::warning('SyncYandexReviews: empty reviews on page, retrying with fresh session', [
+                        'user' => $this->userId,
+                        'page' => $currentPage,
+                        'votes' => $newVotes,
+                        'totalPages' => $totalPages
+                    ]);
+                    
+                    self::dispatch(
+                        $this->userId,
+                        $currentPage,
+                        $lastReviewId,
+                        null,
+                        null,
+                        null,
+                        1
+                    )->delay(now()->addMilliseconds(YandexSetting::SYNC_PAGE_DELAY_MS));
+                    
+                    return;
+                } else {
+                    throw new \RuntimeException('Не удалось получить все отзывы (пустой ответ от Яндекса)');
+                }
+            }
 
             $lastReviewReached = false;
 
@@ -115,7 +141,7 @@ class SyncYandexReviews implements ShouldQueue
                         ],
                         array_merge($data, [
                             'user_id' => $this->userId,
-                            'branch_name' => $data['branch_name'] ?? $businessName ?? $setting->business_name,
+                            'branch_name' => $data['branch_name'] ?? $businessName ?? $setting->business_name
                         ])
                     );
                 }
@@ -123,14 +149,13 @@ class SyncYandexReviews implements ShouldQueue
 
             $nextPage = $currentPage + 1;
             $isFinished = $lastReviewReached ||
-                         ($nextPage >= self::MAX_PAGES) ||
-                         ($nextPage >= $result['totalPages']) ||
+                         ($nextPage >= $totalPages) ||
                          empty($result['reviews']);
 
             Log::info('SyncYandexReviews: page result', [
                 'page' => $currentPage,
                 'nextPage' => $nextPage,
-                'totalPages' => $result['totalPages'] ?? 'null',
+                'totalPages' => $totalPages,
                 'reviewsCount' => count($result['reviews'] ?? []),
                 'lastReviewReached' => $lastReviewReached,
                 'lastReviewId' => $lastReviewId,
@@ -138,16 +163,12 @@ class SyncYandexReviews implements ShouldQueue
             ]);
 
             // Формируем данные для обновления настроек
-            $updateData = [];
-            if ($newRating > 0) {
-                $updateData['rating'] = $newRating;
-            }
-            if ($newVotes > 0) {
-                $updateData['reviews_count'] = $newVotes;
-            }
-            if ($businessName) {
-                $updateData['business_name'] = $businessName;
-            }
+            $updateData = [
+                'total_pages' => $totalPages
+            ];
+            if ($newRating > 0) $updateData['rating'] = $newRating;
+            if ($newVotes > 0) $updateData['reviews_count'] = $newVotes;
+            if ($businessName) $updateData['business_name'] = $businessName;
 
             if ($isFinished) {
                 $updateData['sync_status'] = 'completed';
@@ -167,7 +188,7 @@ class SyncYandexReviews implements ShouldQueue
                     $newCsrfToken,
                     $sessionId,
                     $reqId,
-                    $newCookies
+                    0 // Reset retry count for next page
                 )->delay(now()->addMilliseconds(YandexSetting::SYNC_PAGE_DELAY_MS));
             }
 

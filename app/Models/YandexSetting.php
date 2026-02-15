@@ -23,6 +23,7 @@ class YandexSetting extends Model
         'last_synced_at',
         'sync_status',
         'sync_page',
+        'total_pages',
         'previous_sync_status',
         'sync_error',
     ];
@@ -32,6 +33,7 @@ class YandexSetting extends Model
         'rating' => 'float',
         'reviews_count' => 'integer',
         'sync_page' => 'integer',
+        'total_pages' => 'integer',
     ];
 
     /**

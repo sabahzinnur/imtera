@@ -48,6 +48,7 @@ class SettingsController extends Controller
                 'business_id' => $businessId,
                 'sync_status' => 'pending',
                 'sync_page' => 0,
+                'total_pages' => 0,
                 'previous_sync_status' => null,
                 'sync_error' => null,
                 'last_synced_at' => null,
