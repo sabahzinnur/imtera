@@ -56,7 +56,8 @@ class YandexNewAlgorithmTest extends TestCase
         ]);
 
         $parser = Mockery::mock(YandexMapsParser::class);
-        $parser->shouldReceive('fetchCsrfToken')->andThrow(new \Exception('Yandex Error'));
+        $parser->shouldReceive('prepareSession')->andReturn(['sessionId' => 's', 'reqId' => 'r']);
+        $parser->shouldReceive('fetchPageWithRetry')->andThrow(new \Exception('Yandex Error'));
 
         $job = new SyncYandexReviews($user->id);
         try {
@@ -84,7 +85,8 @@ class YandexNewAlgorithmTest extends TestCase
         ]);
 
         $parser = Mockery::mock(YandexMapsParser::class);
-        $parser->shouldReceive('fetchCsrfToken')->andThrow(new \Exception('Initial Error'));
+        $parser->shouldReceive('prepareSession')->andReturn(['sessionId' => 's', 'reqId' => 'r']);
+        $parser->shouldReceive('fetchPageWithRetry')->andThrow(new \Exception('Initial Error'));
 
         $job = new SyncYandexReviews($user->id);
         try {
@@ -111,21 +113,22 @@ class YandexNewAlgorithmTest extends TestCase
         ]);
 
         $parser = Mockery::mock(YandexMapsParser::class);
-        $parser->shouldReceive('fetchCsrfToken')->andReturn('token');
-        $parser->shouldReceive('getExtractedBusinessName')->andReturn('Name');
         $parser->shouldReceive('prepareSession')->andReturn(['sessionId' => 's', 'reqId' => 'r']);
         
-        $parser->shouldReceive('fetchPage')
-            ->with('123', 'token', 's', 'r', 5)
+        $parser->shouldReceive('fetchPageWithRetry')
             ->once()
-            ->andReturn(['data' => ['reviews' => []]]);
-        
-        $parser->shouldReceive('mapSinglePage')->andReturn([
-            'reviews' => [],
-            'rating' => 4.5,
-            'total' => 100,
-            'totalPages' => 10
-        ]);
+            ->andReturn([
+                'data' => [
+                    'reviews' => [],
+                    'rating' => 4.5,
+                    'total' => 100,
+                    'totalPages' => 10
+                ],
+                'csrfToken' => 'token',
+                'rating' => 4.5,
+                'votes' => 100,
+                'businessName' => 'Name'
+            ]);
 
         $job = new SyncYandexReviews($user->id);
         $job->handle($parser);

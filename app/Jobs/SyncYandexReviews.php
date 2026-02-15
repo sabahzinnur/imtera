@@ -49,15 +49,9 @@ class SyncYandexReviews implements ShouldQueue
         $reqId = $this->reqId;
 
         try {
-            // Устанавливаем куки и получаем CSRF для текущего запроса
-            $csrfToken = $parser->fetchCsrfToken($setting->business_id);
-            if (! $csrfToken) {
-                throw new \RuntimeException('Не удалось получить CSRF-токен');
-            }
-
             if ($this->page === 0) {
-                $isInterrupted = $setting->sync_status !== 'completed' && 
-                                 $setting->sync_status !== 'pending' && 
+                $isInterrupted = $setting->sync_status !== 'completed' &&
+                                 $setting->sync_status !== 'pending' &&
                                  $setting->sync_page > 0;
 
                 if ($isInterrupted) {
@@ -87,13 +81,19 @@ class SyncYandexReviews implements ShouldQueue
                 $reqId = $session['reqId'];
             }
 
-            $rawResult = $parser->fetchPage($setting->business_id, $csrfToken, $sessionId, $reqId, $currentPage);
-            $result = $parser->mapSinglePage($rawResult);
+            $response = $parser->fetchPageWithRetry(
+                $setting->business_id,
+                $csrfToken,
+                $currentPage,
+                $sessionId,
+                $reqId
+            );
 
-            // Получаем актуальные данные из JSON или HTML
-            $newRating = $result['rating'] ?: $parser->getExtractedRating();
-            $newVotes = $result['total'] ?: $parser->getExtractedVotes();
-            $businessName = $parser->getExtractedBusinessName();
+            $result = $response['data'];
+            $newCsrfToken = $response['csrfToken'];
+            $newRating = $result['rating'] ?: $response['rating'];
+            $newVotes = $result['total'] ?: $response['votes'];
+            $businessName = $response['businessName'];
 
             $lastReviewReached = false;
 
@@ -144,7 +144,7 @@ class SyncYandexReviews implements ShouldQueue
                     $this->userId,
                     $nextPage,
                     $lastReviewId,
-                    null,
+                    $newCsrfToken,
                     $sessionId,
                     $reqId
                 )->delay(now()->addMilliseconds(100));

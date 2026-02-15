@@ -2,20 +2,15 @@
 
 namespace Tests\Unit;
 
-use App\Services\YandexMapsParser;
+use App\Services\Yandex\YandexReviewMapper;
 use PHPUnit\Framework\TestCase;
-use ReflectionClass;
 
 class YandexMapsParserTest extends TestCase
 {
     public function test_map_review_extracts_branch_name(): void
     {
-        $parser = new YandexMapsParser();
+        $mapper = new YandexReviewMapper();
         
-        $reflection = new ReflectionClass($parser);
-        $method = $reflection->getMethod('mapReview');
-        $method->setAccessible(true);
-
         $reviewData = [
             'reviewId' => '123',
             'author' => ['name' => 'John'],
@@ -25,7 +20,7 @@ class YandexMapsParserTest extends TestCase
             'branchName' => 'Филиал 1'
         ];
 
-        $mapped = $method->invoke($parser, $reviewData);
+        $mapped = $mapper->mapReview($reviewData);
 
         $this->assertEquals('Филиал 1', $mapped['branch_name']);
         $this->assertEquals('John', $mapped['author_name']);
@@ -33,12 +28,8 @@ class YandexMapsParserTest extends TestCase
 
     public function test_map_review_uses_fallback_keys(): void
     {
-        $parser = new YandexMapsParser();
+        $mapper = new YandexReviewMapper();
         
-        $reflection = new ReflectionClass($parser);
-        $method = $reflection->getMethod('mapReview');
-        $method->setAccessible(true);
-
         $reviewData = [
             'reviewId' => '123',
             'author' => ['name' => 'John'],
@@ -46,7 +37,7 @@ class YandexMapsParserTest extends TestCase
             'org' => ['name' => 'Branch from Org']
         ];
 
-        $mapped = $method->invoke($parser, $reviewData);
+        $mapped = $mapper->mapReview($reviewData);
         $this->assertEquals('Branch from Org', $mapped['branch_name']);
 
         $reviewData2 = [
@@ -56,7 +47,7 @@ class YandexMapsParserTest extends TestCase
             'business' => ['name' => 'Branch from Business']
         ];
 
-        $mapped2 = $method->invoke($parser, $reviewData2);
+        $mapped2 = $mapper->mapReview($reviewData2);
         $this->assertEquals('Branch from Business', $mapped2['branch_name']);
     }
 }
