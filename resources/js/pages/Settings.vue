@@ -15,11 +15,16 @@
              'bg-red-50 border-red-200 text-red-700': setting.sync_status === 'failed',
              'bg-yellow-50 border-yellow-200 text-yellow-700': setting.sync_status === 'aborted'
            }">
-        <div class="flex items-center gap-2 font-medium mb-1">
-          <span v-if="setting.sync_status === 'syncing' || setting.sync_status === 'pending'">⏳ Синхронизация...</span>
-          <span v-else-if="setting.sync_status === 'completed'">✅ Синхронизация завершена</span>
-          <span v-else-if="setting.sync_status === 'failed'">❌ Ошибка синхронизации</span>
-          <span v-else-if="setting.sync_status === 'aborted'">⚠️ Синхронизация прервана</span>
+        <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2 font-medium">
+              <span v-if="setting.sync_status === 'syncing' || setting.sync_status === 'pending'">⏳ Синхронизация...</span>
+              <span v-else-if="setting.sync_status === 'completed'">✅ Синхронизация завершена</span>
+              <span v-else-if="setting.sync_status === 'failed'">❌ Ошибка синхронизации</span>
+              <span v-else-if="setting.sync_status === 'aborted'">⚠️ Синхронизация прервана</span>
+            </div>
+            <div v-if="setting.business_name" class="font-bold">
+                {{ setting.business_name }}
+            </div>
         </div>
         <p v-if="setting.sync_error" class="text-xs mt-1">{{ setting.sync_error }}</p>
         <p v-if="setting.last_synced_at" class="text-xs opacity-75 mt-1">
@@ -65,6 +70,7 @@ import { settings } from '@/routes';
 const props = defineProps<{
     setting: {
         maps_url: string | null;
+        business_name: string | null;
         sync_status: string;
         sync_error: string | null;
         last_synced_at: string | null;
@@ -82,7 +88,7 @@ const isSyncing = computed(() => {
     );
 });
 
-usePolling(isSyncing, { only: ['setting'] });
+usePolling(isSyncing, { only: ['setting'], interval: 1000 });
 
 function save() {
     errors.value = {};

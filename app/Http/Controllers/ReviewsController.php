@@ -44,7 +44,15 @@ class ReviewsController extends Controller
 
         return Inertia::render('Reviews', [
             'reviews' => $reviews,
-            'setting' => $setting,
+            'setting' => $setting ? [
+                'maps_url' => $setting->maps_url,
+                'business_id' => $setting->business_id,
+                'business_name' => $setting->business_name,
+                'rating' => $setting->rating,
+                'reviews_count' => $setting->reviews_count,
+                'sync_status' => $setting->sync_status,
+                'last_synced_at' => $setting->last_synced_at,
+            ] : null,
             'sort' => $sort,
             'perPage' => $perPage,
             'isSyncing' => $setting?->isSyncing() ?? false,

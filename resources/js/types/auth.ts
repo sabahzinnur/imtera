@@ -11,6 +11,7 @@ export type User = {
 
 export type Auth = {
     user: User;
+    business_name: string | null;
 };
 
 export type TwoFactorConfigContent = {

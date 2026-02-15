@@ -20,6 +20,8 @@ class YandexMapsParser
 
     private int $extractedVotes = 0;
 
+    private ?string $extractedBusinessName = null;
+
     public function __construct()
     {
         $this->jar = new CookieJar;
@@ -36,6 +38,11 @@ class YandexMapsParser
             ],
             'cookies' => $this->jar,
         ]);
+    }
+
+    public function getExtractedBusinessName(): ?string
+    {
+        return $this->extractedBusinessName;
     }
 
     /**
@@ -135,6 +142,7 @@ class YandexMapsParser
                 'reviews' => $allReviews,
                 'rating' => $rating,
                 'total' => $total,
+                'business_name' => $this->extractedBusinessName,
                 'is_aborted' => $isAborted,
             ];
 
@@ -144,12 +152,17 @@ class YandexMapsParser
         }
     }
 
-    private function fetchCsrfToken(string $businessId): ?string
+    public function fetchCsrfToken(string $businessId): ?string
     {
         try {
             // Заходим на страницу организации для установки кук
             $response = $this->client->get("/maps/org/{$businessId}/reviews/");
             $html = (string) $response->getBody();
+
+            // Пытаемся вытащить название организации из HTML
+            if (preg_match('/<h1[^>]*class="[^"]*orgpage-header-view__header[^"]*"[^>]*>(.*?)<\/h1>/', $html, $m)) {
+                $this->extractedBusinessName = trim(strip_tags($m[1]));
+            }
 
             // Пытаемся вытащить рейтинг из HTML
             if (preg_match('/"ratingValue"\s*:\s*"?([\d.]+)"?/', $html, $m)) {
@@ -169,7 +182,34 @@ class YandexMapsParser
         return null;
     }
 
-    private function fetchPage(
+    public function prepareSession(): array
+    {
+        $ts = (int) round(microtime(true) * 1000);
+
+        return [
+            'sessionId' => $ts.'_'.rand(100000, 999999),
+            'reqId' => $ts.rand(100, 999).'-'.rand(100000000, 999999999).'-sas1-'.rand(1000, 9999),
+        ];
+    }
+
+    public function mapSinglePage(array $result): array
+    {
+        $reviews = [];
+        foreach (($result['data']['reviews'] ?? []) as $r) {
+            $reviews[] = $this->mapReview($r);
+        }
+
+        $totalReviews = (int) ($result['data']['businessRating']['votes'] ?? $result['data']['params']['count'] ?? 0);
+
+        return [
+            'reviews' => $reviews,
+            'rating' => (float) ($result['data']['businessRating']['score'] ?? 0),
+            'total' => $totalReviews,
+            'totalPages' => (int) ceil($totalReviews / 50),
+        ];
+    }
+
+    public function fetchPage(
         string $businessId,
         string $csrfToken,
         string $sessionId,
@@ -237,8 +277,8 @@ class YandexMapsParser
         return [
             'yandex_review_id' => (string) ($r['reviewId'] ?? $r['id'] ?? uniqid('r_', true)),
             'author_name' => $r['author']['name'] ?? 'Аноним',
-            'author_phone' => $r['author']['publicName'] ?? null,
-            'branch_name' => $r['branchName'] ?? null,
+            'author_phone' => null, // Яндекс обычно не дает телефон. publicName - это не телефон.
+            'branch_name' => $r['branchName'] ?? $r['org']['name'] ?? $r['business']['name'] ?? $this->extractedBusinessName,
             'rating' => (int) ($r['rating'] ?? 0),
             'text' => $r['text'] ?? null,
             'published_at' => $publishedAt,

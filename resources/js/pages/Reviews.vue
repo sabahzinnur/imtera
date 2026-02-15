@@ -167,6 +167,7 @@ const props = defineProps<{
     };
     setting: {
         maps_url: string | null;
+        business_name: string | null;
         rating: number;
         reviews_count: number;
         sync_status: string;
@@ -178,6 +179,7 @@ const props = defineProps<{
 
 usePolling(() => props.isSyncing, {
     only: ['reviews', 'setting', 'isSyncing'],
+    interval: 1000,
 });
 
 const handlePageChange = (page: number) => {

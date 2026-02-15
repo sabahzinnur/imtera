@@ -38,13 +38,22 @@ class SettingsController extends Controller
             ]);
         }
 
+        // Удаляем все отзывы и сбрасываем настройки при смене URL
+        \App\Models\Review::where('user_id', $user->id)->delete();
+
         $user->yandexSetting()->updateOrCreate(
             [],
             [
                 'maps_url' => $newUrl,
                 'business_id' => $businessId,
                 'sync_status' => 'pending',
+                'sync_page' => 0,
+                'previous_sync_status' => null,
                 'sync_error' => null,
+                'last_synced_at' => null,
+                'rating' => null,
+                'reviews_count' => 0,
+                'business_name' => null,
             ]
         );
 

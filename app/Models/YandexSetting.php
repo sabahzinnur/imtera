@@ -11,10 +11,13 @@ class YandexSetting extends Model
         'user_id',
         'maps_url',
         'business_id',
+        'business_name',
         'rating',
         'reviews_count',
         'last_synced_at',
         'sync_status',
+        'sync_page',
+        'previous_sync_status',
         'sync_error',
     ];
 
@@ -22,6 +25,7 @@ class YandexSetting extends Model
         'last_synced_at' => 'datetime',
         'rating' => 'float',
         'reviews_count' => 'integer',
+        'sync_page' => 'integer',
     ];
 
     /**
