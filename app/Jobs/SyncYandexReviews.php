@@ -29,8 +29,7 @@ class SyncYandexReviews implements ShouldQueue
         public ?string $lastReviewId = null,
         public ?string $csrfToken = null,
         public ?string $sessionId = null,
-        public ?string $reqId = null,
-        public ?string $businessName = null
+        public ?string $reqId = null
     ) {}
 
     public function handle(YandexMapsParser $parser): void
@@ -48,10 +47,9 @@ class SyncYandexReviews implements ShouldQueue
         $csrfToken = $this->csrfToken;
         $sessionId = $this->sessionId;
         $reqId = $this->reqId;
-        $businessName = $this->businessName;
 
         try {
-            // Всегда получаем CSRF и устанавливаем куки для текущего запроса
+            // Устанавливаем куки и получаем CSRF для текущего запроса
             $csrfToken = $parser->fetchCsrfToken($setting->business_id);
             if (! $csrfToken) {
                 throw new \RuntimeException('Не удалось получить CSRF-токен');
@@ -63,10 +61,8 @@ class SyncYandexReviews implements ShouldQueue
                                  $setting->sync_page > 0;
 
                 if ($isInterrupted) {
-                    // Возобновляем со страницы, на которой прервались
                     $currentPage = $setting->sync_page;
                 } else {
-                    // Новая синхронизация или обновление (с 1-й страницы)
                     $currentPage = 0;
                     $setting->update([
                         'previous_sync_status' => $setting->sync_status,
@@ -74,7 +70,6 @@ class SyncYandexReviews implements ShouldQueue
                     ]);
 
                     if ($setting->sync_status === 'completed') {
-                        // Это обновление: ищем до последнего известного отзыва
                         $lastReview = Review::where('user_id', $this->userId)
                             ->orderBy('published_at', 'desc')
                             ->first();
@@ -87,7 +82,6 @@ class SyncYandexReviews implements ShouldQueue
                     'sync_error' => null,
                 ]);
 
-                $businessName = $parser->getExtractedBusinessName();
                 $session = $parser->prepareSession();
                 $sessionId = $session['sessionId'];
                 $reqId = $session['reqId'];
@@ -95,6 +89,11 @@ class SyncYandexReviews implements ShouldQueue
 
             $rawResult = $parser->fetchPage($setting->business_id, $csrfToken, $sessionId, $reqId, $currentPage);
             $result = $parser->mapSinglePage($rawResult);
+
+            // Получаем актуальные данные из JSON или HTML
+            $newRating = $result['rating'] ?: $parser->getExtractedRating();
+            $newVotes = $result['total'] ?: $parser->getExtractedVotes();
+            $businessName = $parser->getExtractedBusinessName();
 
             $lastReviewReached = false;
 
@@ -118,40 +117,36 @@ class SyncYandexReviews implements ShouldQueue
                 }
             });
 
-            // Страница обработана успешно. Если это было прерывание, currentPage мог быть > 0.
-            // Следующая страница для очереди — currentPage + 1.
             $nextPage = $currentPage + 1;
-
             $isFinished = $lastReviewReached ||
                          ($nextPage >= self::MAX_PAGES) ||
                          ($nextPage >= $result['totalPages']) ||
                          empty($result['reviews']);
 
-            if ($isFinished) {
-                $setting->update([
-                    'rating' => $result['rating'] ?: $setting->rating,
-                    'reviews_count' => $result['total'] ?: $setting->reviews_count,
-                    'business_name' => $businessName ?: $setting->business_name,
-                    'last_synced_at' => now(),
-                    'sync_status' => 'completed',
-                    'sync_page' => 0,
-                ]);
-            } else {
-                $setting->update([
-                    'sync_page' => $nextPage, // Сохраняем следующую страницу на случай прерывания
-                    'rating' => ($currentPage === 0) ? ($result['rating'] ?: $setting->rating) : $setting->rating,
-                    'reviews_count' => ($currentPage === 0) ? ($result['total'] ?: $setting->reviews_count) : $setting->reviews_count,
-                    'business_name' => ($currentPage === 0) ? ($businessName ?: $setting->business_name) : $setting->business_name,
-                ]);
+            // Формируем данные для обновления настроек
+            $updateData = [];
+            if ($newRating > 0) $updateData['rating'] = $newRating;
+            if ($newVotes > 0) $updateData['reviews_count'] = $newVotes;
+            if ($businessName) $updateData['business_name'] = $businessName;
 
+            if ($isFinished) {
+                $updateData['sync_status'] = 'completed';
+                $updateData['sync_page'] = 0;
+                $updateData['last_synced_at'] = now();
+            } else {
+                $updateData['sync_page'] = $nextPage;
+            }
+
+            $setting->update($updateData);
+
+            if (! $isFinished) {
                 self::dispatch(
                     $this->userId,
                     $nextPage,
                     $lastReviewId,
-                    null, // Токен получим заново в следующем джобе для установки кук
+                    null,
                     $sessionId,
-                    $reqId,
-                    $businessName
+                    $reqId
                 )->delay(now()->addMilliseconds(100));
             }
 
@@ -166,7 +161,7 @@ class SyncYandexReviews implements ShouldQueue
 
             $setting->update([
                 'sync_status' => $statusToRevert,
-                'sync_page' => $currentPage, // Оставляем текущую страницу для возобновления
+                'sync_page' => $currentPage,
                 'sync_error' => $e->getMessage(),
             ]);
 

@@ -45,6 +45,16 @@ class YandexMapsParser
         return $this->extractedBusinessName;
     }
 
+    public function getExtractedRating(): float
+    {
+        return $this->extractedRating;
+    }
+
+    public function getExtractedVotes(): int
+    {
+        return $this->extractedVotes;
+    }
+
     /**
      * Извлечь businessId из URL Яндекс Карт.
      */
