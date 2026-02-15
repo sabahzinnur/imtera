@@ -8,8 +8,11 @@ use Illuminate\Support\Facades\Log;
 class YandexClient
 {
     private Client $httpClient;
+
     private YandexSignatureGenerator $sigGen;
+
     private const BASE_URL = 'https://yandex.ru';
+
     private const REVIEWS_EP = '/maps/api/business/fetchReviews';
 
     public function __construct(YandexSignatureGenerator $sigGen, YandexAuthenticator $auth)
@@ -45,6 +48,13 @@ class YandexClient
         $queryString = http_build_query($params);
         $s = $this->sigGen->generate($queryString);
 
+        Log::debug('YandexClient: sending request', [
+            'page' => $page,
+            'sessionId' => $sessionId,
+            'reqId' => $reqId,
+            'cookiesCount' => count($this->httpClient->getConfig('cookies')->toArray()),
+        ]);
+
         try {
             $response = $this->httpClient->get(self::REVIEWS_EP, [
                 'query' => array_merge($params, ['s' => $s]),
@@ -56,12 +66,12 @@ class YandexClient
             $data = json_decode((string) $response->getBody(), true);
 
             if (isset($data['error'])) {
-                throw new \RuntimeException("Yandex API Error: " . ($data['error']['message'] ?? 'Unknown'));
+                throw new \RuntimeException('Yandex API Error: '.($data['error']['message'] ?? 'Unknown'));
             }
 
             // Проверка на протухший токен (Яндекс может вернуть 403 с новым CSRF в теле)
             if (($data['statusCode'] ?? null) === 403 || str_contains($data['message'] ?? '', 'csrf')) {
-                throw new \App\Exceptions\YandexCsrfExpiredException();
+                throw new \App\Exceptions\YandexCsrfExpiredException;
             }
 
             return $data;

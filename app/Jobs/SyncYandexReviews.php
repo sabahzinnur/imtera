@@ -29,7 +29,8 @@ class SyncYandexReviews implements ShouldQueue
         public ?string $lastReviewId = null,
         public ?string $csrfToken = null,
         public ?string $sessionId = null,
-        public ?string $reqId = null
+        public ?string $reqId = null,
+        public array $cookies = []
     ) {}
 
     public function handle(YandexMapsParser $parser): void
@@ -47,6 +48,7 @@ class SyncYandexReviews implements ShouldQueue
         $csrfToken = $this->csrfToken;
         $sessionId = $this->sessionId;
         $reqId = $this->reqId;
+        $cookies = $this->cookies;
 
         try {
             if ($this->page === 0) {
@@ -86,11 +88,13 @@ class SyncYandexReviews implements ShouldQueue
                 $csrfToken,
                 $currentPage,
                 $sessionId,
-                $reqId
+                $reqId,
+                $cookies
             );
 
             $result = $response['data'];
             $newCsrfToken = $response['csrfToken'];
+            $newCookies = $response['cookies'];
             $newRating = $result['rating'] ?: $response['rating'];
             $newVotes = $result['total'] ?: $response['votes'];
             $businessName = $response['businessName'];
@@ -111,7 +115,7 @@ class SyncYandexReviews implements ShouldQueue
                         ],
                         array_merge($data, [
                             'user_id' => $this->userId,
-                            'branch_name' => $data['branch_name'] ?? $businessName ?? $setting->business_name
+                            'branch_name' => $data['branch_name'] ?? $businessName ?? $setting->business_name,
                         ])
                     );
                 }
@@ -135,9 +139,15 @@ class SyncYandexReviews implements ShouldQueue
 
             // Формируем данные для обновления настроек
             $updateData = [];
-            if ($newRating > 0) $updateData['rating'] = $newRating;
-            if ($newVotes > 0) $updateData['reviews_count'] = $newVotes;
-            if ($businessName) $updateData['business_name'] = $businessName;
+            if ($newRating > 0) {
+                $updateData['rating'] = $newRating;
+            }
+            if ($newVotes > 0) {
+                $updateData['reviews_count'] = $newVotes;
+            }
+            if ($businessName) {
+                $updateData['business_name'] = $businessName;
+            }
 
             if ($isFinished) {
                 $updateData['sync_status'] = 'completed';
@@ -156,7 +166,8 @@ class SyncYandexReviews implements ShouldQueue
                     $lastReviewId,
                     $newCsrfToken,
                     $sessionId,
-                    $reqId
+                    $reqId,
+                    $newCookies
                 )->delay(now()->addMilliseconds(YandexSetting::SYNC_PAGE_DELAY_MS));
             }
 

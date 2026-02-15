@@ -2,17 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SyncYandexReviews;
 use App\Models\Review;
 use App\Models\User;
 use App\Models\YandexSetting;
 use App\Services\YandexMapsParser;
-use App\Jobs\SyncYandexReviews;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithoutMiddleware;
-use Tests\TestCase;
-use Mockery;
-
 use Illuminate\Support\Facades\Queue;
+use Mockery;
+use Tests\TestCase;
 
 class YandexNewAlgorithmTest extends TestCase
 {
@@ -26,17 +25,17 @@ class YandexNewAlgorithmTest extends TestCase
             'user_id' => $user->id,
             'yandex_review_id' => 'old',
             'author_name' => 'Old',
-            'rating' => 5
+            'rating' => 5,
         ]);
 
         $response = $this->actingAs($user)->post('/yandex-settings', [
-            'maps_url' => 'https://yandex.ru/maps/org/test/1010501395/reviews/'
+            'maps_url' => 'https://yandex.ru/maps/org/test/1010501395/reviews/',
         ]);
 
         $response->assertSessionHasNoErrors();
         $response->assertStatus(302);
         $this->assertEquals(0, Review::where('user_id', $user->id)->count());
-        
+
         $setting = $user->yandexSetting;
         $this->assertEquals('pending', $setting->sync_status);
         $this->assertEquals(0, $setting->sync_page);
@@ -52,12 +51,14 @@ class YandexNewAlgorithmTest extends TestCase
             'business_id' => '123',
             'sync_status' => 'completed',
             'previous_sync_status' => 'completed',
-            'sync_page' => 0
+            'sync_page' => 0,
         ]);
 
         $parser = Mockery::mock(YandexMapsParser::class);
         $parser->shouldReceive('prepareSession')->andReturn(['sessionId' => 's', 'reqId' => 'r']);
-        $parser->shouldReceive('fetchPageWithRetry')->andThrow(new \Exception('Yandex Error'));
+        $parser->shouldReceive('fetchPageWithRetry')
+            ->with('123', null, 0, 's', 'r', [])
+            ->andThrow(new \Exception('Yandex Error'));
 
         $job = new SyncYandexReviews($user->id);
         try {
@@ -81,12 +82,14 @@ class YandexNewAlgorithmTest extends TestCase
             'business_id' => '123',
             'sync_status' => 'pending',
             'previous_sync_status' => null,
-            'sync_page' => 0
+            'sync_page' => 0,
         ]);
 
         $parser = Mockery::mock(YandexMapsParser::class);
         $parser->shouldReceive('prepareSession')->andReturn(['sessionId' => 's', 'reqId' => 'r']);
-        $parser->shouldReceive('fetchPageWithRetry')->andThrow(new \Exception('Initial Error'));
+        $parser->shouldReceive('fetchPageWithRetry')
+            ->with('123', null, 0, 's', 'r', [])
+            ->andThrow(new \Exception('Initial Error'));
 
         $job = new SyncYandexReviews($user->id);
         try {
@@ -109,25 +112,27 @@ class YandexNewAlgorithmTest extends TestCase
             'maps_url' => 'https://yandex.ru/maps/org/test/123/reviews/',
             'business_id' => '123',
             'sync_status' => 'failed',
-            'sync_page' => 5
+            'sync_page' => 5,
         ]);
 
         $parser = Mockery::mock(YandexMapsParser::class);
         $parser->shouldReceive('prepareSession')->andReturn(['sessionId' => 's', 'reqId' => 'r']);
-        
+
         $parser->shouldReceive('fetchPageWithRetry')
             ->once()
+            ->with('123', null, 5, 's', 'r', [])
             ->andReturn([
                 'data' => [
                     'reviews' => [],
                     'rating' => 4.5,
                     'total' => 100,
-                    'totalPages' => 10
+                    'totalPages' => 10,
                 ],
                 'csrfToken' => 'token',
+                'cookies' => [],
                 'rating' => 4.5,
                 'votes' => 100,
-                'businessName' => 'Name'
+                'businessName' => 'Name',
             ]);
 
         $job = new SyncYandexReviews($user->id);

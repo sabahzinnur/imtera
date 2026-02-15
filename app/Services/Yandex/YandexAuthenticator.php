@@ -9,19 +9,33 @@ use Illuminate\Support\Facades\Log;
 class YandexAuthenticator
 {
     private CookieJar $jar;
+
     private ?string $csrfToken = null;
+
     private ?string $businessName = null;
+
     private float $rating = 0.0;
+
     private int $votes = 0;
 
     public function __construct()
     {
-        $this->jar = new CookieJar();
+        $this->jar = new CookieJar;
     }
 
     public function getCookieJar(): CookieJar
     {
         return $this->jar;
+    }
+
+    public function getCookies(): array
+    {
+        return $this->jar->toArray();
+    }
+
+    public function setCookies(array $cookies): void
+    {
+        $this->jar = new CookieJar(false, $cookies);
     }
 
     public function getCsrfToken(): ?string
@@ -71,7 +85,7 @@ class YandexAuthenticator
                 $this->votes = (int) $m[1];
             }
 
-            if (!$this->csrfToken) {
+            if (! $this->csrfToken) {
                 throw new \RuntimeException('CSRF token not found in Yandex HTML');
             }
 

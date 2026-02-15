@@ -9,15 +9,15 @@ class YandexMapsParserTest extends TestCase
 {
     public function test_map_review_extracts_branch_name(): void
     {
-        $mapper = new YandexReviewMapper();
-        
+        $mapper = new YandexReviewMapper;
+
         $reviewData = [
             'reviewId' => '123',
             'author' => ['name' => 'John'],
             'rating' => 5,
             'text' => 'Hello',
             'updatedTime' => '2022-09-12T14:22:00Z',
-            'branchName' => 'Филиал 1'
+            'branchName' => 'Филиал 1',
         ];
 
         $mapped = $mapper->mapReview($reviewData);
@@ -28,13 +28,13 @@ class YandexMapsParserTest extends TestCase
 
     public function test_map_review_uses_fallback_keys(): void
     {
-        $mapper = new YandexReviewMapper();
-        
+        $mapper = new YandexReviewMapper;
+
         $reviewData = [
             'reviewId' => '123',
             'author' => ['name' => 'John'],
             'rating' => 5,
-            'org' => ['name' => 'Branch from Org']
+            'org' => ['name' => 'Branch from Org'],
         ];
 
         $mapped = $mapper->mapReview($reviewData);
@@ -44,7 +44,7 @@ class YandexMapsParserTest extends TestCase
             'reviewId' => '124',
             'author' => ['name' => 'John'],
             'rating' => 5,
-            'business' => ['name' => 'Branch from Business']
+            'business' => ['name' => 'Branch from Business'],
         ];
 
         $mapped2 = $mapper->mapReview($reviewData2);

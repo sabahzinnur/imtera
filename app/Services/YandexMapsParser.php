@@ -31,13 +31,17 @@ class YandexMapsParser
         return null;
     }
 
-    public function fetchPageWithRetry(string $businessId, ?string $csrfToken, int $page, string $sessionId, string $reqId): array
+    public function fetchPageWithRetry(string $businessId, ?string $csrfToken, int $page, string $sessionId, string $reqId, array $cookies = []): array
     {
+        if (! empty($cookies)) {
+            $this->auth->setCookies($cookies);
+        }
+
         $token = $csrfToken;
 
         try {
             // Если токена нет вовсе (первый запуск), получаем его
-            if (!$token) {
+            if (! $token) {
                 $token = $this->auth->refresh($this->client->getBaseClient(), $businessId);
             }
 
@@ -46,6 +50,7 @@ class YandexMapsParser
             return [
                 'data' => $this->mapper->mapPage($raw, $this->auth->getBusinessName()),
                 'csrfToken' => $token,
+                'cookies' => $this->auth->getCookies(),
                 'businessName' => $this->auth->getBusinessName(),
                 'rating' => $this->auth->getRating(),
                 'votes' => $this->auth->getVotes(),
@@ -61,6 +66,7 @@ class YandexMapsParser
             return [
                 'data' => $this->mapper->mapPage($raw, $this->auth->getBusinessName()),
                 'csrfToken' => $token,
+                'cookies' => $this->auth->getCookies(),
                 'businessName' => $this->auth->getBusinessName(),
                 'rating' => $this->auth->getRating(),
                 'votes' => $this->auth->getVotes(),
@@ -74,6 +80,7 @@ class YandexMapsParser
     public function prepareSession(): array
     {
         $ts = (int) round(microtime(true) * 1000);
+
         return [
             'sessionId' => $ts.'_'.rand(100000, 999999),
             'reqId' => $ts.rand(100, 999).'-'.rand(100000000, 999999999).'-sas1-'.rand(1000, 9999),
