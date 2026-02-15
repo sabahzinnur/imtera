@@ -123,6 +123,16 @@ class SyncYandexReviews implements ShouldQueue
                          ($nextPage >= $result['totalPages']) ||
                          empty($result['reviews']);
 
+            Log::info('SyncYandexReviews: page result', [
+                'page' => $currentPage,
+                'nextPage' => $nextPage,
+                'totalPages' => $result['totalPages'] ?? 'null',
+                'reviewsCount' => count($result['reviews'] ?? []),
+                'lastReviewReached' => $lastReviewReached,
+                'lastReviewId' => $lastReviewId,
+                'isFinished' => $isFinished,
+            ]);
+
             // Формируем данные для обновления настроек
             $updateData = [];
             if ($newRating > 0) $updateData['rating'] = $newRating;
