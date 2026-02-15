@@ -21,6 +21,8 @@ class SyncYandexReviews implements ShouldQueue
 
     public int $timeout = 60;
 
+    private const MAX_PAGES = 12;
+
     public function __construct(
         public int $userId,
         public int $page = 0,
@@ -100,7 +102,8 @@ class SyncYandexReviews implements ShouldQueue
             $totalPages = $result['totalPages'] ?: (int) ceil($newVotes / 50) ?: $setting->total_pages;
 
             // Если отзывы пусты, но мы знаем что они должны быть - пробуем перезапустить
-            if (empty($result['reviews']) && ($currentPage < ($totalPages - 1) || ($currentPage === 0 && $newVotes > 0))) {
+            // Но только если мы еще не достигли лимита страниц (MAX_PAGES)
+            if (empty($result['reviews']) && ($currentPage < self::MAX_PAGES - 1) && ($currentPage < ($totalPages - 1) || ($currentPage === 0 && $newVotes > 0))) {
                 if ($this->retryCount < 1) {
                     Log::warning('SyncYandexReviews: empty reviews on page, retrying with fresh session', [
                         'user' => $this->userId,
@@ -149,6 +152,7 @@ class SyncYandexReviews implements ShouldQueue
 
             $nextPage = $currentPage + 1;
             $isFinished = $lastReviewReached ||
+                         ($nextPage >= self::MAX_PAGES) ||
                          ($nextPage >= $totalPages) ||
                          empty($result['reviews']);
 
