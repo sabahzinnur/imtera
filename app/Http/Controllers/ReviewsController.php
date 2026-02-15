@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Jobs\SyncYandexReviews;
 use App\Models\Review;
+use App\Models\YandexSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -23,7 +24,7 @@ class ReviewsController extends Controller
 
         if ($setting && $setting->business_id && ! $setting->isSyncing()) {
             $lastSynced = $setting->last_synced_at;
-            if (! $lastSynced || $lastSynced->diffInMinutes(now()) >= 10) {
+            if (! $lastSynced || $lastSynced->diffInMinutes(now()) >= YandexSetting::SYNC_AUTO_REFRESH_MINUTES) {
                 SyncYandexReviews::dispatch($user->id);
             }
         }
@@ -57,6 +58,7 @@ class ReviewsController extends Controller
             'sort' => $sort,
             'perPage' => $perPage,
             'isSyncing' => $setting?->isSyncing() ?? false,
+            'pollingInterval' => YandexSetting::POLLING_INTERVAL_MS,
         ]);
     }
 

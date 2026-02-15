@@ -7,6 +7,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class YandexSetting extends Model
 {
+    public const SYNC_AUTO_REFRESH_MINUTES = 10;
+    public const SYNC_PAGE_DELAY_MS = 100;
+    public const POLLING_INTERVAL_MS = 1000;
+
     protected $fillable = [
         'user_id',
         'maps_url',

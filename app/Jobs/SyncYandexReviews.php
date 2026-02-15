@@ -147,7 +147,7 @@ class SyncYandexReviews implements ShouldQueue
                     $newCsrfToken,
                     $sessionId,
                     $reqId
-                )->delay(now()->addMilliseconds(100));
+                )->delay(now()->addMilliseconds(YandexSetting::SYNC_PAGE_DELAY_MS));
             }
 
         } catch (\Exception $e) {

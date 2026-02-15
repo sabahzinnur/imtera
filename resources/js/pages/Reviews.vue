@@ -104,8 +104,8 @@
 <script setup lang="ts">
 import { router, Link } from '@inertiajs/vue3';
 import { RefreshCw } from 'lucide-vue-next';
-import ReviewCard from '@/components/ReviewCard.vue';
 import RatingCard from '@/components/RatingCard.vue';
+import ReviewCard from '@/components/ReviewCard.vue';
 import SyncStatus from '@/components/SyncStatus.vue';
 import { Button } from '@/components/ui/button';
 import { Pagination } from '@/components/ui/pagination';
@@ -113,9 +113,9 @@ import YandexMapsBadge from '@/components/YandexMapsBadge.vue';
 import { usePolling } from '@/composables/usePolling';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { settings, reviews as reviewsRoute } from '@/routes';
+import reviewsSync from '@/routes/reviews';
 import { type Review } from '@/types';
 
-import reviewsSync from '@/routes/reviews';
 
 const props = defineProps<{
     reviews: {
@@ -134,11 +134,12 @@ const props = defineProps<{
     sort: string;
     perPage: number;
     isSyncing: boolean;
+    pollingInterval: number;
 }>();
 
 usePolling(() => props.isSyncing, {
     only: ['reviews', 'setting', 'isSyncing'],
-    interval: 1000,
+    interval: props.pollingInterval,
 });
 
 const handlePageChange = (page: number) => {
