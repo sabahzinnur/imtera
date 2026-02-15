@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { type Review } from '@/types';
+import YandexIcon from '@/components/YandexIcon.vue';
 
 defineProps<{
     review: Review;
@@ -9,19 +10,11 @@ defineProps<{
 <template>
     <div class="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
         <div class="mb-2 flex items-start justify-between">
-            <div class="flex items-center gap-3 text-sm text-app font-bold">
+            <div class="text-app flex items-center gap-3 text-sm font-bold">
                 <span>{{ review.published_at }}</span>
                 <span v-if="review.branch_name" class="flex items-center gap-1">
                     {{ review.branch_name }}
-                    <svg
-                        class="h-3.5 w-3.5 text-red-500"
-                        fill="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"
-                        />
-                    </svg>
+                    <YandexIcon />
                 </span>
             </div>
             <div class="flex gap-0.5">

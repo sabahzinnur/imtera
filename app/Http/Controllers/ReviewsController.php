@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SyncYandexReviews;
 use App\Models\Review;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -17,10 +19,19 @@ class ReviewsController extends Controller
         $user = auth()->user();
         $setting = $user->yandexSetting;
         $sort = $request->query('sort', 'newest');
+        $perPage = (int) $request->query('per_page', 50);
+
+        if ($setting && $setting->business_id && ! $setting->isSyncing()) {
+            $lastSynced = $setting->last_synced_at;
+            if (! $lastSynced || $lastSynced->diffInMinutes(now()) >= 10) {
+                SyncYandexReviews::dispatch($user->id);
+            }
+        }
 
         $reviews = Review::where('user_id', $user->id)
             ->sorted($sort)
-            ->paginate(10)
+            ->paginate($perPage)
+            ->withQueryString()
             ->through(fn (Review $review) => [
                 'id' => $review->id,
                 'author_name' => $review->author_name,
@@ -33,9 +44,36 @@ class ReviewsController extends Controller
 
         return Inertia::render('Reviews', [
             'reviews' => $reviews,
-            'setting' => $setting,
+            'setting' => $setting ? [
+                'maps_url' => $setting->maps_url,
+                'business_id' => $setting->business_id,
+                'business_name' => $setting->business_name,
+                'rating' => $setting->rating,
+                'reviews_count' => $setting->reviews_count,
+                'sync_status' => $setting->sync_status,
+                'sync_error' => $setting->sync_error,
+                'last_synced_at' => $setting->last_synced_at,
+            ] : null,
             'sort' => $sort,
+            'perPage' => $perPage,
             'isSyncing' => $setting?->isSyncing() ?? false,
         ]);
+    }
+
+    /**
+     * Manually trigger a synchronization.
+     */
+    public function sync(): RedirectResponse
+    {
+        $user = auth()->user();
+        $setting = $user->yandexSetting;
+
+        if ($setting && $setting->business_id && ! $setting->isSyncing()) {
+            SyncYandexReviews::dispatch($user->id);
+
+            return back()->with('success', __('Синхронизация запущена.'));
+        }
+
+        return back();
     }
 }

@@ -9,7 +9,7 @@
             </div>
 
             <p class="text-m mb-4 px-1 text-[#6C757D]">
-                {{ $page.props.auth.user.name }}
+                {{ $page.props.auth.business_name || $page.props.auth.user.name }}
             </p>
 
             <Separator class="mb-4 bg-panel" />
